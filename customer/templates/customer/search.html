@@ -1,0 +1,76 @@
+{% extends 'customer/base.html' %}
+{% block title %}Search – {{ restaurant.name }}{% endblock %}
+{% block nav_search %}active{% endblock %}
+{% block content %}
+<div class="pb-24 animate">
+    <div class="page-header">
+        <div class="header-row">
+            <a href="/menu/{{ token }}/home/?table={{ table }}" class="back-btn">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+                </svg>
+            </a>
+            <span class="page-title">Search</span>
+        </div>
+        <form method="get" action="/menu/{{ token }}/search/">
+            <input type="hidden" name="table" value="{{ table }}" />
+            <div class="search-bar" style="margin:0;">
+                <div class="search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.35-4.35" />
+                    </svg></div>
+                <input type="text" name="q" value="{{ query }}" placeholder="Search dishes..." autofocus
+                    style="padding-right:48px;" />
+            </div>
+        </form>
+    </div>
+
+    <div style="padding:16px;">
+        {% if query %}
+        {% if results %}
+        <p style="font-size:.82rem;color:var(--gray-500);margin-bottom:14px;">{{ results.count }} result{{
+            results.count|pluralize }} for "{{ query }}"</p>
+        {% for item in results %}
+        <a href="/menu/{{ token }}/item/{{ item.id }}/?table={{ table }}"
+            style="display:flex;align-items:center;gap:12px;background:#fff;border-radius:18px;padding:14px;box-shadow:var(--shadow);margin-bottom:12px;">
+            {% if item.display_image %}<img src="{{ item.display_image }}"
+                style="width:80px;height:80px;border-radius:12px;flex-shrink:0;object-fit:cover;" />
+            {% else %}<div
+                style="width:80px;height:80px;border-radius:12px;flex-shrink:0;background:var(--gray-100);display:flex;align-items:center;justify-content:center;font-size:2rem;">
+                🍽️</div>{% endif %}
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:800;font-size:.95rem;color:var(--gray-900);">{{ item.name }}</div>
+                <div style="font-size:.78rem;color:var(--gray-500);margin:3px 0;">{{ item.category.name }} · ⏱ {{
+                    item.prep_time }}</div>
+                <div style="font-weight:900;font-size:1rem;color:var(--gray-900);">₹{{ item.price }}</div>
+            </div>
+            <button class="add-btn"
+                onclick="event.preventDefault();addToCart('{{ item.id }}','{{ item.name }}',{{ item.price }},'{{ item.display_image }}')">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                </svg>
+            </button>
+        </a>
+        {% endfor %}
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon"><svg viewBox="0 0 24 24" fill="currentColor">
+                    <path
+                        d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+                </svg></div>
+            <p class="empty-title">No results found</p>
+            <p class="empty-sub">Try a different keyword like "butter chicken" or "naan".</p>
+        </div>
+        {% endif %}
+        {% else %}
+        <p style="text-align:center;color:var(--gray-400);margin-top:48px;font-size:.9rem;">Type a dish name to
+            search...</p>
+        {% endif %}
+    </div>
+
+    <div class="cart-bar" id="floating-cart-bar">
+        <div class="cart-bar-info" id="cart-bar-info"></div>
+        <a href="/menu/{{ token }}/cart/?table={{ table }}" class="cart-bar-btn">View Cart →</a>
+    </div>
+</div>
+{% endblock %}

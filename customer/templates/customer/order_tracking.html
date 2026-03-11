@@ -1,0 +1,116 @@
+{% extends 'customer/base.html' %}
+{% block title %}Track Order #{{ order.id }}{% endblock %}
+{% block nav_orders %}active{% endblock %}
+{% block content %}
+<div class="pb-24 animate">
+    <div class="page-header">
+        <div class="header-row">
+            <a href="javascript:history.back()" class="back-btn">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+                </svg>
+            </a>
+            <span class="page-title">Order #{{ order.id }}</span>
+        </div>
+    </div>
+
+    <div style="padding:16px;">
+        <!-- Status Banner -->
+        <div
+            style="background:var(--red);border-radius:20px;padding:24px;text-align:center;margin-bottom:16px;color:#fff;">
+            <div id="status-emoji" style="font-size:3rem;margin-bottom:8px;">⏳</div>
+            <div id="status-text" style="font-size:1.3rem;font-weight:900;">{{ order.status }}</div>
+            <div id="status-sub" style="font-size:.82rem;opacity:.8;margin-top:4px;">Live order tracking</div>
+        </div>
+
+        <!-- Progress Steps -->
+        <div style="background:#fff;border-radius:20px;padding:18px;box-shadow:var(--shadow);margin-bottom:14px;">
+            <h3 style="font-weight:800;margin-bottom:16px;">Order Progress</h3>
+            {% with statuses="Received|Preparing|Ready|Served" %}
+            {% for step in "Received,Preparing,Ready,Served"|split:"," %}
+            {% endfor %}
+            {% endwith %}
+            <div id="progress-steps"></div>
+        </div>
+
+        <!-- Order Items -->
+        <div style="background:#fff;border-radius:20px;padding:18px;box-shadow:var(--shadow);margin-bottom:14px;">
+            <h3 style="font-weight:800;margin-bottom:12px;">Your Order</h3>
+            {% for item in order.items.all %}
+            <div
+                style="display:flex;justify-content:space-between;font-size:.88rem;color:var(--gray-700);margin-bottom:8px;">
+                <span>{{ item.quantity }}× {{ item.name }}</span>
+                <span style="font-weight:700;">₹{{ item.subtotal }}</span>
+            </div>
+            {% endfor %}
+            <div
+                style="border-top:1px solid var(--gray-100);margin-top:10px;padding-top:10px;display:flex;justify-content:space-between;font-weight:900;">
+                <span>Total</span><span style="color:var(--red);">₹{{ order.total }}</span>
+            </div>
+        </div>
+
+        <!-- Call to action based on status -->
+        <div id="cta-area"></div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+    const steps = ['Received', 'Preparing', 'Ready', 'Served', 'Completed'];
+    const emojis = { Received: '📋', Preparing: '👨‍🍳', Ready: '🔔', Served: '🍽️', Completed: '✅', Cancelled: '❌' };
+    const subs = { Received: 'Order received by kitchen', Preparing: 'Chef is cooking your food', Ready: 'Your food is ready!', Served: 'Enjoy your meal!', Completed: 'Order completed', Cancelled: 'Order was cancelled' };
+    let currentStatus = '{{ order.status }}';
+
+    function renderProgress(status) {
+        const idx = steps.indexOf(status);
+        let html = '';
+        steps.forEach((s, i) => {
+            const done = i < idx || status === 'Completed';
+            const active = s === status;
+            const cancelled = status === 'Cancelled';
+            html += `<div style="display:flex;align-items:center;gap:12px;margin-bottom:${i < steps.length - 1 ? '4px' : '0'}">
+      <div style="width:32px;height:32px;border-radius:50%;background:${done || active ? 'var(--red)' : 'var(--gray-100)'};color:${done || active ? '#fff' : 'var(--gray-400)'};display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;flex-shrink:0;">
+        ${done ? '✓' : i + 1}
+      </div>
+      <span style="font-weight:${active ? '800' : '400'};color:${active ? 'var(--gray-900)' : 'var(--gray-500)'};font-size:.9rem;">${s}</span>
+      ${active ? `<span class="status status-${s.toLowerCase()}" style="margin-left:auto;">${s}</span>` : ''}
+    </div>
+    ${i < steps.length - 1 ? `<div style="width:32px;display:flex;justify-content:center;"><div style="width:2px;height:20px;background:${i < idx ? 'var(--red)' : 'var(--gray-100)'};border-radius:2px;"></div></div>` : ''}`;
+        });
+        document.getElementById('progress-steps').innerHTML = html;
+    }
+
+    function updateUI(status) {
+        document.getElementById('status-emoji').textContent = emojis[status] || '⏳';
+        document.getElementById('status-text').textContent = status;
+        document.getElementById('status-sub').textContent = subs[status] || '';
+        renderProgress(status);
+
+        const cta = document.getElementById('cta-area');
+        if (status === 'Completed' || status === 'Served') {
+            cta.innerHTML = `<a href="/menu/{{ token }}/home/?table={{ table }}" class="btn btn-primary">Order Again 🍛</a>`;
+        } else if (status === 'Cancelled') {
+            cta.innerHTML = `<a href="/menu/{{ token }}/home/?table={{ table }}" class="btn btn-primary">Back to Menu</a>`;
+        } else {
+            cta.innerHTML = '';
+        }
+    }
+
+    async function pollStatus() {
+        try {
+            const resp = await fetch('/api/public/orders/{{ order.id }}/track/');
+            const data = await resp.json();
+            if (data.status !== currentStatus) {
+                currentStatus = data.status;
+                updateUI(currentStatus);
+            }
+        } catch (e) { }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        updateUI(currentStatus);
+        // Poll every 8 seconds
+        setInterval(pollStatus, 8000);
+    });
+</script>
+{% endblock %}

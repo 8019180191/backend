@@ -1,0 +1,121 @@
+{% extends 'customer/base.html' %}
+{% block title %}{{ item.name }} – {{ restaurant.name }}{% endblock %}
+{% block content %}
+<div class="pb-24 animate">
+    <!-- Image Hero -->
+    <div style="position:relative;height:300px;background:var(--gray-100);">
+        {% if item.display_image %}
+        <img src="{{ item.display_image }}" alt="{{ item.name }}" style="width:100%;height:100%;object-fit:cover;" />
+        {% else %}
+        <div
+            style="height:300px;display:flex;align-items:center;justify-content:center;font-size:5rem;background:var(--red-light);">
+            🍽️</div>
+        {% endif %}
+        <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.6) 0%,transparent 50%);">
+        </div>
+        <a href="javascript:history.back()"
+            style="position:absolute;top:52px;left:16px;width:40px;height:40px;background:rgba(255,255,255,.9);border-radius:50%;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);">
+            <svg viewBox="0 0 24 24" fill="var(--gray-900)" width="20" height="20">
+                <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+            </svg>
+        </a>
+        <div style="position:absolute;bottom:16px;left:16px;right:16px;">
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">
+                {% for tag in item.tags %}
+                <span
+                    class="tag {% if tag == 'Veg' %}tag-veg{% elif tag == 'Non-Veg' %}tag-nonveg{% else %}tag-popular{% endif %}">{{
+                    tag }}</span>
+                {% endfor %}
+            </div>
+            <h1 style="color:#fff;font-size:1.5rem;font-weight:900;">{{ item.name }}</h1>
+        </div>
+    </div>
+
+    <!-- Details -->
+    <div style="background:#fff;padding:20px;margin-bottom:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <span style="font-size:1.6rem;font-weight:900;color:var(--gray-900);">₹{{ item.price }}</span>
+            <div style="display:flex;gap:12px;font-size:.8rem;color:var(--gray-500);">
+                <span>🌶️ {{ item.spice_level }}</span>
+                <span>⏱ {{ item.prep_time }}</span>
+                <span>{{ item.category.name }}</span>
+            </div>
+        </div>
+        {% if item.description %}
+        <p style="font-size:.9rem;color:var(--gray-700);line-height:1.6;">{{ item.description }}</p>
+        {% endif %}
+    </div>
+
+    <!-- Special Instructions -->
+    <div style="background:#fff;padding:20px;margin-bottom:12px;">
+        <h3 style="font-weight:800;font-size:.95rem;color:var(--gray-900);margin-bottom:10px;">Special Instructions</h3>
+        <textarea id="item-notes" placeholder="Any preferences? Extra spice, no onion..." rows="2"
+            style="width:100%;background:var(--gray-50);border:1.5px solid var(--gray-200);border-radius:12px;padding:12px;font-size:.85rem;resize:none;outline:none;font-family:inherit;"></textarea>
+    </div>
+
+    <!-- Quantity + Add to Cart -->
+    <div
+        style="position:fixed;bottom:76px;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:#fff;border-top:1px solid var(--gray-100);padding:14px 20px;z-index:150;box-shadow:0 -4px 20px rgba(0,0,0,.08);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <div class="qty-control" id="qty-ctl">
+                <button class="qty-btn" onclick="changeQty(-1)"><svg viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <path d="M5 12h14" />
+                    </svg></button>
+                <span class="qty-val" id="qty-val">1</span>
+                <button class="qty-btn" onclick="changeQty(1)"><svg viewBox="0 0 24 24" fill="currentColor" width="14"
+                        height="14">
+                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                    </svg></button>
+            </div>
+            <button class="btn btn-primary" style="flex:1;" onclick="doAddToCart()">
+                Add to Cart · <span id="total-price">₹{{ item.price }}</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Related Items -->
+    {% if related %}
+    <div style="padding:16px;">
+        <h2 class="section-title" style="margin-bottom:14px;">You might also like</h2>
+        {% for r in related %}
+        <a href="/menu/{{ token }}/item/{{ r.id }}/?table={{ table }}"
+            style="display:flex;align-items:center;gap:12px;background:#fff;border-radius:16px;padding:12px;box-shadow:var(--shadow);margin-bottom:10px;">
+            {% if r.display_image %}<img src="{{ r.display_image }}"
+                style="width:64px;height:64px;border-radius:10px;flex-shrink:0;object-fit:cover;" />
+            {% else %}<div
+                style="width:64px;height:64px;border-radius:10px;flex-shrink:0;background:var(--gray-100);display:flex;align-items:center;justify-content:center;font-size:1.5rem;">
+                🍽️</div>{% endif %}
+            <div style="flex:1;">
+                <div style="font-weight:700;font-size:.9rem;">{{ r.name }}</div>
+                <div style="font-size:.8rem;color:var(--gray-500);">₹{{ r.price }}</div>
+            </div>
+            <button class="add-btn"
+                onclick="event.preventDefault();addToCart('{{ r.id }}','{{ r.name }}',{{ r.price }},'{{ r.display_image }}')">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                </svg>
+            </button>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+    let qty = 1;
+    const basePrice = {{ item.price }};
+    function changeQty(d) {
+        qty = Math.max(1, qty + d);
+        document.getElementById('qty-val').textContent = qty;
+        document.getElementById('total-price').textContent = '₹' + (basePrice * qty).toFixed(0);
+    }
+    function doAddToCart() {
+        const notes = document.getElementById('item-notes').value;
+        for (let i = 0; i < qty; i++) {
+            addToCart('{{ item.id }}', '{{ item.name|escapejs }}', {{ item.price }}, '{{ item.display_image|escapejs }}');
+    }
+}
+</script>
+{% endblock %}

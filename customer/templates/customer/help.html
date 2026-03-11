@@ -1,0 +1,73 @@
+{% extends 'customer/base.html' %}
+{% block title %}Help & Support – {{ restaurant.name }}{% endblock %}
+{% block content %}
+<div class="pb-24 animate">
+    <div class="page-header">
+        <div class="header-row">
+            <a href="javascript:history.back()" class="back-btn">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+                </svg>
+            </a>
+            <span class="page-title">Help & Support</span>
+        </div>
+    </div>
+    <div style="padding:16px;">
+        <div
+            style="background:linear-gradient(135deg,var(--red),#c62828);border-radius:20px;padding:24px;text-align:center;margin-bottom:20px;color:#fff;">
+            <div style="font-size:2.5rem;margin-bottom:8px;">🍽️</div>
+            <h2 style="font-weight:900;font-size:1.2rem;margin-bottom:6px;">{{ restaurant.name }}</h2>
+            <p style="font-size:.82rem;opacity:.85;">{{ restaurant.address }}</p>
+        </div>
+        {% for item in faq %}
+        {% endfor %}
+        <!-- FAQ Section -->
+        <h3 style="font-weight:800;margin-bottom:12px;">Frequently Asked Questions</h3>
+        {% with faqs="How do I place an order?;How can I track my order?;Can I modify my order after placing?;What
+        payment methods are accepted?;How do I get assistance from staff?" %}
+        {% with answers="Browse the menu, add items to cart, and tap 'Proceed to Pay' at checkout.;After placing an
+        order, go to 'Orders' to track real-time status updates.;Once an order is placed, please ask a staff member for
+        modifications.;We accept both counter payment (cash) and online payment options.;Call for a waiter using the
+        'Call Staff' button below, or approach any staff member." %}
+        <div style="background:#fff;border-radius:20px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:16px;">
+            <details style="border-bottom:1px solid var(--gray-100);">
+                <summary style="padding:16px;font-weight:700;cursor:pointer;">How do I place an order?</summary>
+                <p style="padding:0 16px 16px;font-size:.85rem;color:var(--gray-700);line-height:1.6;">Browse the menu,
+                    add items to cart, and tap 'Proceed to Pay' at checkout.</p>
+            </details>
+            <details style="border-bottom:1px solid var(--gray-100);">
+                <summary style="padding:16px;font-weight:700;cursor:pointer;">How can I track my order?</summary>
+                <p style="padding:0 16px 16px;font-size:.85rem;color:var(--gray-700);line-height:1.6;">After placing an
+                    order, go to 'Orders' tab to see real-time status updates.</p>
+            </details>
+            <details style="border-bottom:1px solid var(--gray-100);">
+                <summary style="padding:16px;font-weight:700;cursor:pointer;">Can I modify my order after placing?
+                </summary>
+                <p style="padding:0 16px 16px;font-size:.85rem;color:var(--gray-700);line-height:1.6;">Once an order is
+                    placed, please speak to a staff member for modifications.</p>
+            </details>
+            <details style="border-bottom:1px solid var(--gray-100);">
+                <summary style="padding:16px;font-weight:700;cursor:pointer;">What payment methods are accepted?
+                </summary>
+                <p style="padding:0 16px 16px;font-size:.85rem;color:var(--gray-700);line-height:1.6;">We accept counter
+                    payment (cash/card) and online payment at checkout.</p>
+            </details>
+            <details>
+                <summary style="padding:16px;font-weight:700;cursor:pointer;">How do I call for waiter assistance?
+                </summary>
+                <p style="padding:0 16px 16px;font-size:.85rem;color:var(--gray-700);line-height:1.6;">Use the 'Call
+                    Staff' button below or approach any of our staff members.</p>
+            </details>
+        </div>
+        {% endwith %}
+        {% endwith %}
+        <!-- Call Staff Button -->
+        <button onclick="showToast('Staff has been notified! 🔔')" class="btn btn-primary" style="margin-bottom:12px;">
+            🔔 Call Staff
+        </button>
+        <a href="/menu/{{ token }}/home/?table={{ table }}" class="btn btn-outline">
+            Back to Menu
+        </a>
+    </div>
+</div>
+{% endblock %}

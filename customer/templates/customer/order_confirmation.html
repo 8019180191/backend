@@ -1,0 +1,41 @@
+{% extends 'customer/base.html' %}
+{% block title %}Order Confirmed – {{ restaurant.name }}{% endblock %}
+{% block bottom_nav %}{% endblock %}
+{% block content %}
+<div class="animate"
+    style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;text-align:center;background:linear-gradient(160deg,#E8F5E9 0%,#fff 60%);">
+    <div
+        style="width:90px;height:90px;background:#E8F5E9;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;font-size:3rem;">
+        ✅</div>
+    <h1 style="font-size:1.8rem;font-weight:900;color:var(--gray-900);margin-bottom:8px;">Order Placed!</h1>
+    <p style="font-size:.9rem;color:var(--gray-500);margin-bottom:6px;">Your order has been received.</p>
+    <div
+        style="background:#fff;border-radius:18px;padding:18px 24px;box-shadow:var(--shadow);margin:24px 0;width:100%;max-width:300px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+            <span style="color:var(--gray-500);font-size:.85rem;">Order ID</span>
+            <span style="font-weight:800;color:var(--gray-900);">#{{ order.id }}</span>
+        </div>
+        {% if order.table_number %}
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+            <span style="color:var(--gray-500);font-size:.85rem;">Table</span>
+            <span style="font-weight:700;">{{ order.table_number }}</span>
+        </div>
+        {% endif %}
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+            <span style="color:var(--gray-500);font-size:.85rem;">Total Paid</span>
+            <span style="font-weight:800;color:var(--red);">₹{{ order.total }}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+            <span style="color:var(--gray-500);font-size:.85rem;">Payment</span>
+            <span style="font-weight:700;">{{ order.payment_method }}</span>
+        </div>
+    </div>
+    <a href="/menu/{{ token }}/track/{{ order.id }}/?table={{ table }}" class="btn btn-primary"
+        style="max-width:280px;margin-bottom:12px;">
+        🔍 Track Order
+    </a>
+    <a href="/menu/{{ token }}/home/?table={{ table }}" class="btn btn-outline" style="max-width:280px;">
+        Order More
+    </a>
+</div>
+{% endblock %}

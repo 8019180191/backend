@@ -1,0 +1,65 @@
+{% extends 'customer/base.html' %}
+{% block title %}My Orders – {{ restaurant.name }}{% endblock %}
+{% block nav_orders %}active{% endblock %}
+{% block content %}
+<div class="pb-24 animate">
+    <div class="page-header">
+        <div class="header-row">
+            <a href="/menu/{{ token }}/home/?table={{ table }}" class="back-btn">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+                </svg>
+            </a>
+            <span class="page-title">My Orders</span>
+        </div>
+    </div>
+    <div style="padding:16px;" id="orders-list">
+        <div class="empty-state" id="empty-state" style="display:none;">
+            <div class="empty-icon"><svg viewBox="0 0 24 24" fill="currentColor">
+                    <path
+                        d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z" />
+                </svg></div>
+            <p class="empty-title">No orders yet</p>
+            <p class="empty-sub">Your orders from this session will appear here.</p>
+            <a href="/menu/{{ token }}/home/?table={{ table }}" class="btn btn-primary"
+                style="margin-top:16px;max-width:220px;">Browse Menu</a>
+        </div>
+        <div id="orders-container"></div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+    const emojis = { Received: '📋', Preparing: '👨‍🍳', Ready: '🔔', Served: '🍽️', Completed: '✅', Cancelled: '❌' };
+    async function loadOrders() {
+        const ids = JSON.parse(sessionStorage.getItem('order_ids_{{ token }}') || '[]');
+        if (!ids.length) { document.getElementById('empty-state').style.display = 'flex'; return; }
+        try {
+            const resp = await fetch('/api/public/orders/history/?ids=' + ids.join(','));
+            const orders = await resp.json();
+            if (!orders.length) { document.getElementById('empty-state').style.display = 'flex'; return; }
+            let html = '';
+            orders.forEach(o => {
+                html += `<a href="/menu/{{ token }}/track/${o.id}/?table={{ table }}" style="display:block;background:#fff;border-radius:18px;padding:16px;box-shadow:var(--shadow);margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div>
+            <div style="font-weight:800;font-size:.95rem;color:var(--gray-900);">${emojis[o.status] || '📋'} Order #${o.id}</div>
+            <div style="font-size:.75rem;color:var(--gray-500);">Table ${o.table_number || 'N/A'} · ${new Date(o.placed_at).toLocaleString()}</div>
+          </div>
+          <span class="status status-${o.status.toLowerCase()}">${o.status}</span>
+        </div>
+        <div style="font-size:.82rem;color:var(--gray-600);margin-bottom:8px;">${o.items.slice(0, 3).map(i => i.quantity + '× ' + i.name).join(', ')}${o.items.length > 3 ? '...' : ''}</div>
+        <div style="display:flex;justify-content:space-between;font-size:.88rem;">
+          <span style="color:var(--gray-500);">${o.items.length} item${o.items.length > 1 ? 's' : ''}</span>
+          <span style="font-weight:900;color:var(--red);">₹${o.total}</span>
+        </div>
+      </a>`;
+            });
+            document.getElementById('orders-container').innerHTML = html;
+        } catch (e) {
+            document.getElementById('empty-state').style.display = 'flex';
+        }
+    }
+    document.addEventListener('DOMContentLoaded', loadOrders);
+</script>
+{% endblock %}

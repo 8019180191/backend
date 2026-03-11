@@ -1,0 +1,145 @@
+{% extends 'customer/base.html' %}
+{% block title %}Cart – {{ restaurant.name }}{% endblock %}
+{% block nav_cart %}active{% endblock %}
+{% block content %}
+<div class="animate" style="padding-bottom:180px;">
+    <div class="page-header">
+        <div class="header-row">
+            <a href="javascript:history.back()" class="back-btn">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+                </svg>
+            </a>
+            <span class="page-title">Your Cart</span>
+        </div>
+    </div>
+
+    <!-- Empty State -->
+    <div id="empty-cart" style="display:none;" class="empty-state">
+        <div class="empty-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+                <path
+                    d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45-.03.12c0 .56.44 1 1 1h11v-2H7.42l1.1-2h7.48c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0 0 20.47 4H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z" />
+            </svg>
+        </div>
+        <p class="empty-title">Your cart is empty</p>
+        <p class="empty-sub">Browse the menu and add items to your cart.</p>
+        <a href="/menu/{{ token }}/home/?table={{ table }}" class="btn btn-primary"
+            style="margin-top:20px;max-width:240px;">Browse Menu</a>
+    </div>
+
+    <!-- Cart Items Container -->
+    <div id="cart-container" style="padding:16px;">
+        <div id="cart-items"
+            style="background:#fff;border-radius:20px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:14px;">
+        </div>
+
+        <!-- Notes -->
+        <div style="background:#fff;border-radius:20px;padding:18px;box-shadow:var(--shadow);margin-bottom:14px;">
+            <h3 style="font-weight:800;font-size:.95rem;margin-bottom:10px;">Cooking Instructions</h3>
+            <textarea id="cooking-notes" placeholder="Any specific preferences? E.g. no onion, extra spice..." rows="2"
+                style="width:100%;background:var(--gray-50);border:1.5px solid var(--gray-200);border-radius:12px;padding:12px;font-size:.85rem;resize:none;outline:none;font-family:inherit;"></textarea>
+        </div>
+
+        <!-- Bill Details -->
+        <div style="background:#fff;border-radius:20px;padding:18px;box-shadow:var(--shadow);">
+            <h3 style="font-weight:800;font-size:.95rem;margin-bottom:14px;">Bill Details</h3>
+            <div
+                style="display:flex;justify-content:space-between;font-size:.88rem;color:var(--gray-600);margin-bottom:8px;">
+                <span>Item Total</span><span id="bill-subtotal" style="color:var(--gray-900);font-weight:600;">₹0</span>
+            </div>
+            <div
+                style="display:flex;justify-content:space-between;font-size:.88rem;color:var(--gray-600);margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--gray-100);">
+                <span>Taxes & Charges (5%)</span><span id="bill-tax"
+                    style="color:var(--gray-900);font-weight:600;">₹0</span>
+            </div>
+            <div
+                style="display:flex;justify-content:space-between;font-size:1.05rem;font-weight:900;color:var(--gray-900);">
+                <span>To Pay</span><span id="bill-total">₹0</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bottom checkout bar -->
+<div style="position:fixed;bottom:76px;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:#fff;border-top:1px solid var(--gray-100);padding:14px 20px;z-index:150;box-shadow:0 -4px 20px rgba(0,0,0,.08);"
+    id="checkout-bar">
+    <a href="/menu/{{ token }}/checkout/?table={{ table }}" class="btn btn-primary"
+        style="justify-content:space-between;padding:14px 20px;" id="checkout-btn">
+        <div style="display:flex;flex-direction:column;align-items:flex-start;">
+            <span
+                style="font-size:.7rem;color:rgba(255,255,255,.7);font-weight:600;text-transform:uppercase;">Total</span>
+            <span id="checkout-total" style="font-size:1.1rem;">₹0</span>
+        </div>
+        <span>Proceed to Pay →</span>
+    </a>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+    function renderCart() {
+        const cart = getCart();
+        const container = document.getElementById('cart-items');
+        const empty = document.getElementById('empty-cart');
+        const cartCont = document.getElementById('cart-container');
+        const checkoutBar = document.getElementById('checkout-bar');
+
+        if (!cart.length) {
+            empty.style.display = 'flex';
+            cartCont.style.display = 'none';
+            checkoutBar.style.display = 'none';
+            return;
+        }
+        empty.style.display = 'none';
+        cartCont.style.display = 'block';
+        checkoutBar.style.display = 'block';
+
+        let html = '';
+        cart.forEach((item, idx) => {
+            html += `<div style="display:flex;gap:12px;padding:14px;${idx < cart.length - 1 ? 'border-bottom:1px solid var(--gray-50)' : ''}">
+      ${item.image ? `<img src="${item.image}" style="width:80px;height:80px;border-radius:12px;flex-shrink:0;object-fit:cover;"/>` : `<div style="width:80px;height:80px;border-radius:12px;flex-shrink:0;background:var(--gray-100);display:flex;align-items:center;justify-content:center;font-size:2rem;">🍽️</div>`}
+      <div style="flex:1;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+          <span style="font-weight:800;font-size:.92rem;">${item.name}</span>
+          <button onclick="removeItem('${item.id}')" style="color:var(--gray-400);padding:2px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+          </button>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">
+          <span style="font-weight:900;font-size:1rem;">₹${(item.price * item.quantity).toFixed(0)}</span>
+          <div class="qty-control">
+            <button class="qty-btn" onclick="updateItemQty('${item.id}',-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><path d="M5 12h14"/></svg></button>
+            <span class="qty-val">${item.quantity}</span>
+            <button class="qty-btn" onclick="updateItemQty('${item.id}',1)"><svg viewBox="0 0 24 24" fill="currentColor" width="14"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+        });
+        html += `<div style="padding:14px;"><a href="/menu/{{ token }}/home/?table={{ table }}" style="display:block;text-align:center;padding:12px;border:2px dashed var(--gray-200);border-radius:14px;color:var(--gray-500);font-weight:700;font-size:.85rem;">+ Add More Items</a></div>`;
+        container.innerHTML = html;
+
+        const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+        const tax = Math.round(subtotal * 0.05);
+        const total = subtotal + tax;
+        document.getElementById('bill-subtotal').textContent = '₹' + subtotal.toFixed(0);
+        document.getElementById('bill-tax').textContent = '₹' + tax;
+        document.getElementById('bill-total').textContent = '₹' + total;
+        document.getElementById('checkout-total').textContent = '₹' + total;
+    }
+    function removeItem(id) {
+        const cart = getCart().filter(i => i.id !== id);
+        saveCart(cart);
+        renderCart();
+    }
+    function updateItemQty(id, d) {
+        const cart = getCart();
+        const item = cart.find(i => i.id === id);
+        if (!item) return;
+        item.quantity = Math.max(1, item.quantity + d);
+        saveCart(cart);
+        renderCart();
+    }
+    document.addEventListener('DOMContentLoaded', renderCart);
+</script>
+{% endblock %}

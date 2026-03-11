@@ -1,0 +1,76 @@
+{% extends 'customer/base.html' %}
+{% block title %}{{ category.name }} – {{ restaurant.name }}{% endblock %}
+{% block nav_home %}active{% endblock %}
+{% block content %}
+<div class="pb-24 animate">
+    <div class="page-header">
+        <div class="header-row">
+            <a href="/menu/{{ token }}/home/?table={{ table }}" class="back-btn">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+                </svg>
+            </a>
+            <div>
+                <p class="page-title">{{ category.icon }} {{ category.name }}</p>
+                <p style="font-size:.75rem;color:var(--gray-500);">{{ items.count }} items available</p>
+            </div>
+        </div>
+    </div>
+
+    <div style="padding:16px;">
+        {% for item in items %}
+        <div
+            style="background:#fff;border-radius:18px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:14px;display:flex;gap:0;flex-direction:column;">
+            <a href="/menu/{{ token }}/item/{{ item.id }}/?table={{ table }}"
+                style="display:flex;align-items:center;gap:14px;padding:14px;">
+                {% if item.display_image %}
+                <img src="{{ item.display_image }}"
+                    style="width:90px;height:90px;border-radius:12px;flex-shrink:0;object-fit:cover;" />
+                {% else %}
+                <div
+                    style="width:90px;height:90px;border-radius:12px;flex-shrink:0;background:var(--gray-100);display:flex;align-items:center;justify-content:center;font-size:2.5rem;">
+                    🍽️</div>
+                {% endif %}
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:800;font-size:.95rem;color:var(--gray-900);margin-bottom:4px;">{{ item.name
+                        }}</div>
+                    <div
+                        style="font-size:.78rem;color:var(--gray-500);line-height:1.4;margin-bottom:6px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">
+                        {{ item.description }}</div>
+                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                        {% for tag in item.tags %}
+                        <span
+                            class="tag {% if tag == 'Veg' %}tag-veg{% elif tag == 'Non-Veg' %}tag-nonveg{% else %}tag-popular{% endif %}">{{
+                            tag }}</span>
+                        {% endfor %}
+                        <span class="spice">🌶️ {{ item.spice_level }} · ⏱ {{ item.prep_time }}</span>
+                    </div>
+                    <div style="font-size:1.05rem;font-weight:900;color:var(--gray-900);margin-top:8px;">₹{{ item.price
+                        }}</div>
+                </div>
+                <button class="add-btn"
+                    onclick="event.preventDefault();addToCart('{{ item.id }}','{{ item.name }}',{{ item.price }},'{{ item.display_image }}')">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                    </svg>
+                </button>
+            </a>
+        </div>
+        {% empty %}
+        <div class="empty-state">
+            <div class="empty-icon"><svg viewBox="0 0 24 24" fill="currentColor">
+                    <path
+                        d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z" />
+                </svg></div>
+            <p class="empty-title">No items yet</p>
+            <p class="empty-sub">This category has no available items at the moment.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="cart-bar" id="floating-cart-bar">
+        <div class="cart-bar-info" id="cart-bar-info"></div>
+        <a href="/menu/{{ token }}/cart/?table={{ table }}" class="cart-bar-btn">View Cart →</a>
+    </div>
+</div>
+{% endblock %}
