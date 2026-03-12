@@ -23,13 +23,9 @@
             <div id="status-sub" style="font-size:.82rem;opacity:.8;margin-top:4px;">Live order tracking</div>
         </div>
 
-        <!-- Progress Steps -->
+        <!-- Progress Steps (rendered by JS below) -->
         <div style="background:#fff;border-radius:20px;padding:18px;box-shadow:var(--shadow);margin-bottom:14px;">
             <h3 style="font-weight:800;margin-bottom:16px;">Order Progress</h3>
-            {% with statuses="Received|Preparing|Ready|Served" %}
-            {% for step in "Received,Preparing,Ready,Served"|split:"," %}
-            {% endfor %}
-            {% endwith %}
             <div id="progress-steps"></div>
         </div>
 

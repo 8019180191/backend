@@ -12,15 +12,17 @@
             </a>
             <span class="page-title">Search</span>
         </div>
-        <form method="get" action="/menu/{{ token }}/search/">
+        <form method="get" action="/menu/{{ token }}/search/" id="search-form">
             <input type="hidden" name="table" value="{{ table }}" />
-            <div class="search-bar" style="margin:0;">
+            <div class="search-bar" style="margin:0;position:relative;">
                 <div class="search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="11" cy="11" r="8" />
                         <path d="m21 21-4.35-4.35" />
                     </svg></div>
-                <input type="text" name="q" value="{{ query }}" placeholder="Search dishes..." autofocus
-                    style="padding-right:48px;" />
+                <input type="text" name="q" id="search-input" value="{{ query }}" placeholder="Search dishes..."
+                    autofocus style="padding-right:56px;" />
+                <button type="submit"
+                    style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:var(--red);border:none;border-radius:10px;padding:6px 12px;color:#fff;font-weight:700;font-size:.8rem;cursor:pointer;">Go</button>
             </div>
         </form>
     </div>

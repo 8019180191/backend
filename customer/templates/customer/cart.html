@@ -133,10 +133,13 @@
         renderCart();
     }
     function updateItemQty(id, d) {
-        const cart = getCart();
+        let cart = getCart();
         const item = cart.find(i => i.id === id);
         if (!item) return;
-        item.quantity = Math.max(1, item.quantity + d);
+        item.quantity += d;
+        if (item.quantity <= 0) {
+            cart = cart.filter(i => i.id !== id);
+        }
         saveCart(cart);
         renderCart();
     }
