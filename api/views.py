@@ -77,6 +77,10 @@ class LoginView(APIView):
         })
 
 
+import random
+from django.core.mail import send_mail
+from django.conf import settings
+
 class ForgotPasswordView(APIView):
     permission_classes = [AllowAny]
 
@@ -84,35 +88,86 @@ class ForgotPasswordView(APIView):
         email = request.data.get('email', '')
         try:
             owner = Owner.objects.get(email=email)
-            reset_token = str(uuid.uuid4())
-            owner.reset_token = reset_token
-            owner.reset_token_expiry = timezone.now() + timedelta(hours=1)
+            # Generate 6-digit OTP
+            otp = str(random.randint(100000, 999999))
+            owner.reset_token = otp
+            owner.reset_token_expiry = timezone.now() + timedelta(minutes=10)
             owner.save()
-            # In production, send email. For now, return token in response.
-            return Response({'message': 'Password reset link sent.', 'reset_token': reset_token})
+
+            # Send email
+            subject = 'Password Reset OTP'
+            message = f'Your OTP for password reset is: {otp}. It is valid for 10 minutes.'
+            email_from = settings.DEFAULT_FROM_EMAIL
+            recipient_list = [email]
+            
+            try:
+                send_mail(subject, message, email_from, recipient_list)
+                return Response({'message': 'OTP sent to your email.'})
+            except Exception as e:
+                print(f"Error sending email: {e}")
+                return Response({'error': f'Failed to send email: {str(e)}'}, status=500)
         except Owner.DoesNotExist:
             return Response({'error': 'No account found with this email.'}, status=404)
+
+
+class VerifyOTPView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        # Support both Body and Query Params
+        data = request.data if request.data else request.query_params
+        email = str(data.get('email', '')).strip()
+        otp = str(data.get('otp', '') or data.get('token', '')).strip()
+        
+        print(f"DEBUG: VerifyOTP Attempt - Data: {data}")
+        print(f"DEBUG: Email: '{email}', OTP: '{otp}'")
+        
+        try:
+            owner = Owner.objects.get(email=email)
+            if owner.reset_token == otp:
+                if owner.reset_token_expiry and owner.reset_token_expiry < timezone.now():
+                    return Response({'error': 'OTP has expired.'}, status=400)
+                return Response({'message': 'OTP verified successfully.'})
+            else:
+                return Response({'error': 'Invalid OTP.'}, status=400)
+        except Owner.DoesNotExist:
+            return Response({'error': 'Invalid email.'}, status=400)
 
 
 class ResetPasswordView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        token = request.data.get('token', '')
-        new_password = request.data.get('new_password', '')
+        # Support both Body and Query Params
+        data = request.data if request.data else request.query_params
+        email = str(data.get('email', '')).strip()
+        otp = str(data.get('otp', '') or data.get('token', '')).strip()
+        new_password = str(data.get('new_password', '')).strip()
+        
+        print(f"DEBUG: ResetPassword Attempt - Data: {data}")
+        print(f"DEBUG: Email: '{email}', OTP: '{otp}', Pass: '{new_password[:2]}...'")
+
+        if not email or not otp or not new_password:
+            return Response({'error': 'Email, OTP, and new_password are required.'}, status=400)
+
         if len(new_password) < 6:
             return Response({'error': 'Password must be at least 6 characters.'}, status=400)
+        
         try:
-            owner = Owner.objects.get(reset_token=token)
-            if owner.reset_token_expiry < timezone.now():
-                return Response({'error': 'Reset token has expired.'}, status=400)
-            owner.set_password(new_password)
-            owner.reset_token = None
-            owner.reset_token_expiry = None
-            owner.save()
-            return Response({'message': 'Password reset successfully.'})
+            owner = Owner.objects.get(email=email)
+            if owner.reset_token == otp:
+                if owner.reset_token_expiry and owner.reset_token_expiry < timezone.now():
+                    return Response({'error': 'OTP has expired.'}, status=400)
+                
+                owner.set_password(new_password)
+                owner.reset_token = None
+                owner.reset_token_expiry = None
+                owner.save()
+                return Response({'message': 'Password reset successfully.'})
+            else:
+                return Response({'error': 'Invalid OTP.'}, status=400)
         except Owner.DoesNotExist:
-            return Response({'error': 'Invalid or expired reset token.'}, status=400)
+            return Response({'error': 'Invalid email.'}, status=400)
 
 
 class ChangePasswordView(APIView):
@@ -229,7 +284,7 @@ class CategoryDetailView(APIView):
         if not category:
             return Response({'error': 'Category not found.'}, status=404)
         category.delete()
-        return Response({'message': 'Category deleted.'}, status=204)
+        return Response(status=204)
 
 
 # ─────────────────── MENU ITEMS ───────────────────
@@ -351,7 +406,7 @@ class MenuItemDetailView(APIView):
         if not item:
             return Response({'error': 'Item not found.'}, status=404)
         item.delete()
-        return Response({'message': 'Menu item deleted.'}, status=204)
+        return Response(status=204)
 
 
 class MenuItemToggleView(APIView):

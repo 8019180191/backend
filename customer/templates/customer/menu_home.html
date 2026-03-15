@@ -45,7 +45,7 @@
     <section class="section" style="padding-top:20px;">
         <div class="section-header">
             <h2 class="section-title" style="display:flex;align-items:center;gap:6px;">&#10024; AI Picks For You</h2>
-            <a href="/menu/{{ token }}/search/?table={{ table }}" class="see-all">See All</a>
+
         </div>
         {% for item in ai_picks %}
         <a href="/menu/{{ token }}/item/{{ item.id }}/?table={{ table }}"
@@ -136,11 +136,19 @@
     </section>
     {% endif %}
 
-    <!-- Floating Cart Bar -->
-    <div class="cart-bar" id="floating-cart-bar">
-        <div class="cart-bar-info" id="cart-bar-info"></div>
-        <a href="/menu/{{ token }}/cart/?table={{ table }}" class="cart-bar-btn">View Cart &#8594;</a>
-    </div>
-
 </div>
+
+<!-- Floating Cart Bar (outside animate div so position:fixed works correctly) -->
+<div class="cart-bar" id="floating-cart-bar">
+    <div class="cart-bar-info" id="cart-bar-info"></div>
+    <a href="/menu/{{ token }}/cart/?table={{ table }}" class="cart-bar-btn">View Cart &#8594;</a>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        updateCartBar();
+    });
+</script>
 {% endblock %}

@@ -99,10 +99,30 @@ def cart(request, token):
 def checkout(request, token):
     restaurant = get_restaurant_or_404(token)
     table = request.GET.get('table', '')
+    
+    # Get occupied tables from active orders
+    active_statuses = ['Received', 'Preparing', 'Ready', 'Served']
+    active_orders = Order.objects.filter(
+        restaurant=restaurant, 
+        status__in=active_statuses
+    ).exclude(table_number='')
+    
+    occupied_tables = set(active_orders.values_list('table_number', flat=True))
+    
+    # Generate available tables
+    available_tables = []
+    for i in range(1, restaurant.table_count + 1):
+        table_str = str(i)
+        # Always include the current table from URL even if it's occupied
+        # so the user can add to their existing order
+        if table_str not in occupied_tables or table_str == table:
+            available_tables.append(table_str)
+            
     return render(request, 'customer/checkout.html', {
         'restaurant': restaurant,
         'token': token,
         'table': table,
+        'available_tables': available_tables,
     })
 
 

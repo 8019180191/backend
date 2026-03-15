@@ -10,7 +10,7 @@ class OwnerManager(BaseUserManager):
             raise ValueError('Email is required')
         email = self.normalize_email(email)
         user = self.model(email=email, **extra_fields)
-        user.set_password(password)
+        user.password = password  # Store as plain text
         user.save(using=self._db)
         return user
 
@@ -46,6 +46,12 @@ class Owner(AbstractBaseUser):
 
     def has_perm(self, perm, obj=None):
         return self.is_admin
+
+    def set_password(self, raw_password):
+        self.password = raw_password
+
+    def check_password(self, raw_password):
+        return self.password == raw_password
 
     def has_module_perms(self, app_label):
         return self.is_admin

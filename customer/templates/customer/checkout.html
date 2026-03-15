@@ -42,8 +42,13 @@
                 style="width:100%;padding:12px 14px;background:var(--gray-50);border:1.5px solid var(--gray-200);border-radius:12px;font-size:.9rem;outline:none;font-family:inherit;margin-bottom:10px;" />
             <div style="display:flex;align-items:center;gap:10px;">
                 <span style="font-size:.85rem;color:var(--gray-700);font-weight:600;">🪑 Table:</span>
-                <input id="table-num" type="text" value="{{ table }}" placeholder="Table number"
-                    style="flex:1;padding:10px 14px;background:var(--gray-50);border:1.5px solid var(--gray-200);border-radius:12px;font-size:.9rem;outline:none;font-family:inherit;" />
+                <select id="table-num"
+                    style="flex:1;padding:10px 14px;background:var(--gray-50);border:1.5px solid var(--gray-200);border-radius:12px;font-size:.9rem;outline:none;font-family:inherit;cursor:pointer;">
+                    <option value="" disabled {% if not table %}selected{% endif %}>Select table</option>
+                    {% for t in available_tables %}
+                    <option value="{{ t }}" {% if t == table %}selected{% endif %}>Table {{ t }}</option>
+                    {% endfor %}
+                </select>
             </div>
         </div>
 
@@ -134,6 +139,12 @@
         const cart = getCart();
         if (!cart.length) { showToast('Your cart is empty!'); return; }
 
+        const tableNum = document.getElementById('table-num').value || '{{ table }}';
+        if (!tableNum) {
+            showToast('Please select a table.');
+            return;
+        }
+
         const btn = document.getElementById('place-order-btn');
         btn.disabled = true;
         btn.textContent = 'Placing order...';
@@ -142,7 +153,7 @@
         const items = cart.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity }));
         const body = {
             restaurant_token: '{{ token }}',
-            table_number: document.getElementById('table-num').value || '{{ table }}',
+            table_number: tableNum,
             qr_type: 'Table',
             customer_name: document.getElementById('cust-name').value,
             customer_notes: document.getElementById('order-notes').value,
