@@ -1,0 +1,167 @@
+{% extends 'customer/base.html' %}
+{% load static %}
+{% block title %}Payment – {{ restaurant.name }}{% endblock %}
+{% block bottom_nav %}{% endblock %}
+{% block content %}
+<div class="animate" style="padding-bottom:100px;">
+    <div class="page-header">
+        <div class="header-row">
+            <span class="page-title">Select Payment Method</span>
+        </div>
+    </div>
+
+    <div style="padding:16px;">
+        <div style="background:#fff;border-radius:24px;padding:20px;box-shadow:var(--shadow);margin-bottom:20px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:15px;align-items:center;">
+                <span style="color:var(--gray-600);font-weight:600;">Amount to Pay</span>
+                <span style="font-size:1.5rem;font-weight:900;color:var(--gray-900);">₹{{ order.total|floatformat:0 }}</span>
+            </div>
+            <div style="font-size:0.85rem;color:var(--gray-500);border-top:1px dashed var(--gray-200);padding-top:10px;">
+                Order ID: #{{ order.id }}
+            </div>
+        </div>
+
+        <h3 style="font-weight:800;margin:20px 0 12px 4px;font-size:1.1rem;">UPI Methods</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
+            <div class="pay-option" onclick="processPayment('Google Pay')">
+                <img src="{% static 'gpay.jpg' %}" style="width:85%;height:auto;max-height:45px;object-fit:contain;">
+            </div>
+            <div class="pay-option" onclick="processPayment('PhonePe')">
+                <img src="{% static 'phonepe.png' %}" style="width:85%;height:auto;max-height:45px;object-fit:contain;">
+            </div>
+            <div class="pay-option" onclick="processPayment('Paytm')">
+                <img src="{% static 'paytm.png' %}" style="width:85%;height:auto;max-height:35px;object-fit:contain;">
+            </div>
+            <div class="pay-option" onclick="processPayment('Other UPI')">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:1.4rem;">💳</span>
+                    <span style="font-size:0.9rem;font-weight:800;color:var(--gray-800);">Any UPI App</span>
+                </div>
+            </div>
+        </div>
+
+        <h3 style="font-weight:800;margin:20px 0 12px 4px;font-size:1.1rem;">Other Options</h3>
+        <div style="background:#fff;border-radius:20px;box-shadow:var(--shadow);overflow:hidden;border:1px solid var(--gray-50);">
+            <div class="list-option" onclick="processPayment('Cards')">
+                <div style="width:40px;height:40px;background:#f8f9fa;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">💳</div>
+                <div style="flex:1;margin-left:14px;">
+                    <div style="font-weight:800;font-size:0.95rem;color:var(--gray-800);">Debit / Credit Cards</div>
+                    <div style="font-size:0.75rem;color:var(--gray-500);">Visa, Mastercard, RuPay</div>
+                </div>
+                <svg style="width:18px;color:var(--gray-300)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+            </div>
+            <div class="list-option" onclick="processPayment('Netbanking')">
+                <div style="width:40px;height:40px;background:#f8f9fa;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">🏦</div>
+                <div style="flex:1;margin-left:14px;">
+                    <div style="font-weight:800;font-size:0.95rem;color:var(--gray-800);">Net Banking</div>
+                    <div style="font-size:0.75rem;color:var(--gray-500);">All major Indian banks</div>
+                </div>
+                <svg style="width:18px;color:var(--gray-300)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Razorpay Simulation Overlay -->
+<div id="payment-overlay" style="display:none;position:fixed;inset:0;background:#fff;z-index:1000;flex-direction:column;align-items:center;justify-content:center;padding:40px;">
+    <div style="margin-bottom:40px;text-align:center;">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/8/89/Razorpay_logo.svg" style="height:32px;margin-bottom:12px;">
+        <div style="height:2px;background:var(--gray-100);width:150px;margin:0 auto;position:relative;overflow:hidden;">
+            <div id="progress-bar" style="position:absolute;height:100%;background:#3395FF;width:0%;transition:width 0.3s ease;"></div>
+        </div>
+    </div>
+    
+    <div id="payment-status" style="text-align:center;">
+        <div class="spinner"></div>
+        <p style="margin-top:20px;font-weight:600;color:var(--gray-700);" id="status-text">Connecting to bank...</p>
+    </div>
+
+    <div id="success-checkmark" style="display:none;text-align:center;animation:scaleIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;">
+        <div style="width:80px;height:80px;background:#27ae60;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+            <svg style="width:40px;color:#fff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <h2 style="font-weight:900;color:var(--gray-900);">Payment Successful!</h2>
+        <p style="color:var(--gray-500);margin-top:8px;">Redirecting to your order...</p>
+    </div>
+</div>
+
+<style>
+    .pay-option {
+        background: #fff;
+        border: 1.5px solid var(--gray-100);
+        border-radius: 20px;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.85rem;
+        transition: all 0.2s;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .pay-option:active {
+        transform: scale(0.96);
+        border-color: #3395FF;
+        background: #f0f7ff;
+    }
+    .list-option {
+        display: flex;
+        align-items: center;
+        padding: 18px;
+        border-bottom: 1px solid var(--gray-50);
+        transition: background 0.2s;
+    }
+    .list-option:active {
+        background: var(--gray-50);
+    }
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #3395FF;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @keyframes scaleIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+</style>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function processPayment(method) {
+        const overlay = document.getElementById('payment-overlay');
+        const progress = document.getElementById('progress-bar');
+        const statusText = document.getElementById('status-text');
+        
+        overlay.style.display = 'flex';
+        
+        // Step 1: Connecting
+        setTimeout(() => {
+            progress.style.width = '30%';
+            statusText.textContent = `Opening ${method}...`;
+        }, 800);
+
+        // Step 2: Processing
+        setTimeout(() => {
+            progress.style.width = '70%';
+            statusText.textContent = 'Verifying with your bank...';
+        }, 2500);
+
+        // Step 3: Success
+        setTimeout(() => {
+            progress.style.width = '100%';
+            document.getElementById('payment-status').style.display = 'none';
+            document.getElementById('success-checkmark').style.display = 'block';
+        }, 4500);
+
+        // Step 4: Redirect
+        setTimeout(() => {
+            window.location.href = '/menu/{{ token }}/order-confirmed/{{ order.id }}/?table={{ table }}';
+        }, 6000);
+    }
+</script>
+{% endblock %}

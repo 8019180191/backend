@@ -46,7 +46,7 @@
                     style="flex:1;padding:10px 14px;background:var(--gray-50);border:1.5px solid var(--gray-200);border-radius:12px;font-size:.9rem;outline:none;font-family:inherit;cursor:pointer;">
                     <option value="" disabled {% if not table %}selected{% endif %}>Select table</option>
                     {% for t in available_tables %}
-                    <option value="{{ t }}" {% if t == table %}selected{% endif %}>Table {{ t }}</option>
+                    <option value="{{ t.num }}" {% if t.is_selected %}selected{% endif %}>Table {{ t.num }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -119,9 +119,6 @@
 
     function renderSummary() {
         const cart = getCart();
-        const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-        const tax = Math.round(subtotal * 0.05);
-        const total = subtotal + tax;
         let html = '';
         cart.forEach(i => {
             html += `<div style="display:flex;justify-content:space-between;font-size:.85rem;color:var(--gray-700);margin-bottom:6px;">
@@ -130,9 +127,21 @@
     </div>`;
         });
         document.getElementById('order-summary-items').innerHTML = html;
-        document.getElementById('co-subtotal').textContent = '₹' + subtotal.toFixed(0);
-        document.getElementById('co-tax').textContent = '₹' + tax;
-        document.getElementById('co-total').textContent = '₹' + total;
+
+        const savedTotalsStr = sessionStorage.getItem('checkout_totals_{{ token }}');
+        if (savedTotalsStr) {
+            const savedTotals = JSON.parse(savedTotalsStr);
+            document.getElementById('co-subtotal').textContent = '₹' + savedTotals.subtotal.toFixed(0);
+            document.getElementById('co-tax').textContent = '₹' + savedTotals.tax;
+            document.getElementById('co-total').textContent = '₹' + savedTotals.total;
+        } else {
+            const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+            const tax = Math.round(subtotal * 0.05);
+            const total = subtotal + tax;
+            document.getElementById('co-subtotal').textContent = '₹' + subtotal.toFixed(0);
+            document.getElementById('co-tax').textContent = '₹' + tax;
+            document.getElementById('co-total').textContent = '₹' + total;
+        }
     }
 
     async function placeOrder() {
@@ -172,7 +181,14 @@
                 ids.push(data.order_id);
                 sessionStorage.setItem('order_ids_{{ token }}', JSON.stringify(ids));
                 saveCart([]);
-                window.location.href = '/menu/{{ token }}/order-confirmed/' + data.order_id + '/?table={{ table }}';
+                sessionStorage.removeItem('cooking_notes_{{ token }}');
+                sessionStorage.removeItem('checkout_totals_{{ token }}');
+                
+                if (paymentMethod === 'Online') {
+                    window.location.href = `/menu/{{ token }}/payment/${data.order_id}/?table={{ table }}`;
+                } else {
+                    window.location.href = '/menu/{{ token }}/order-confirmed/' + data.order_id + '/?table={{ table }}';
+                }
             } else {
                 showToast('Error: ' + (data.error || 'Could not place order'));
                 btn.disabled = false;
@@ -187,6 +203,12 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', renderSummary);
+    document.addEventListener('DOMContentLoaded', () => {
+        renderSummary();
+        const savedNotes = sessionStorage.getItem('cooking_notes_{{ token }}');
+        if (savedNotes) {
+            document.getElementById('order-notes').value = savedNotes;
+        }
+    });
 </script>
 {% endblock %}

@@ -2,16 +2,19 @@ import uuid
 import qrcode
 import io
 import base64
+import traceback
 from datetime import datetime, timedelta
 from django.utils import timezone
 from django.db.models import Sum, Count, Q
 from django.contrib.auth import authenticate
 from rest_framework import generics, status
 from rest_framework.views import APIView
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import Owner, Restaurant, MenuCategory, MenuItem, Order, OrderItem
+from .models import Owner, Restaurant, MenuCategory, MenuItem, Order, OrderItem, DailyAnalytics, OwnerNotification, OwnerNotificationSetting
+from .utils import update_daily_stats
 from .serializers import (
     RegisterSerializer, LoginSerializer, RestaurantSerializer,
     MenuCategorySerializer, MenuItemSerializer, OrderSerializer,
@@ -27,6 +30,68 @@ def get_tokens_for_user(user):
     }
 
 
+def create_notification(restaurant, notification_type, icon, title, body):
+    """Helper to create a notification for a restaurant owner. Non-fatal, respects settings."""
+    try:
+        # Get or create settings
+        settings, _ = OwnerNotificationSetting.objects.get_or_create(restaurant=restaurant)
+        
+        # Check if this type of notification is enabled
+        should_send = True
+        if notification_type == 'new_order':
+            should_send = settings.new_order_alerts
+        elif notification_type == 'order_status_update':
+            should_send = settings.order_status_updates
+        elif notification_type == 'daily_sales_summary':
+            should_send = settings.daily_sales_summary
+        elif notification_type in ['combo_created', 'price_updated', 'promotion_applied']:
+            should_send = settings.ai_suggestions
+            
+        if not should_send:
+            return
+
+        OwnerNotification.objects.create(
+            restaurant=restaurant,
+            notification_type=notification_type,
+            icon=icon,
+            title=title,
+            body=body
+        )
+    except Exception as e:
+        print(f"ERROR creating notification: {str(e)}")
+
+
+def preprocess_menu_item_data(data):
+    # Convert QueryDict to a mutable dict to handle list values correctly
+    if hasattr(data, 'dict'):
+        data = data.dict()
+    else:
+        data = data.copy()
+    
+    import json
+    # Handle tags string
+    if 'tags' in data:
+        tags = data['tags']
+        if isinstance(tags, str):
+            try:
+                # Try to parse as JSON first (e.g. ["Tag1", "Tag2"])
+                tags_list = json.loads(tags)
+                if not isinstance(tags_list, list):
+                    tags_list = [str(tags_list)]
+            except Exception:
+                # Fallback to comma-separated list (e.g. "Tag1, Tag2")
+                tags_list = [t.strip() for t in tags.split(',') if t.strip()]
+            data['tags'] = tags_list
+
+    # Handle is_available string
+    if 'is_available' in data:
+        val = data['is_available']
+        if isinstance(val, str):
+            data['is_available'] = val.lower() in ('true', '1', 'yes')
+            
+    return data
+
+
 # ─────────────────── AUTH ───────────────────
 
 class RegisterView(APIView):
@@ -34,18 +99,21 @@ class RegisterView(APIView):
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
-        if serializer.is_valid():
-            owner = serializer.save()
-            tokens = get_tokens_for_user(owner)
-            restaurant = owner.restaurant
-            return Response({
-                'message': 'Account created successfully',
-                'tokens': tokens,
-                'owner': OwnerSerializer(owner).data,
-                'restaurant_id': restaurant.id,
-                'qr_token': restaurant.qr_token,
-            }, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        if not serializer.is_valid():
+            # Get the first error message from the dictionary
+            error_msg = next(iter(serializer.errors.values()))[0] if serializer.errors else "Registration failed"
+            return Response({'error': error_msg}, status=status.HTTP_400_BAD_REQUEST)
+        
+        owner = serializer.save()
+        tokens = get_tokens_for_user(owner)
+        restaurant = owner.restaurant
+        return Response({
+            'message': 'Account created successfully',
+            'tokens': tokens,
+            'owner': OwnerSerializer(owner).data,
+            'restaurant_id': restaurant.id,
+            'qr_token': restaurant.qr_token,
+        }, status=status.HTTP_201_CREATED)
 
 
 class LoginView(APIView):
@@ -189,6 +257,7 @@ class ChangePasswordView(APIView):
 
 class RestaurantView(APIView):
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request):
         try:
@@ -217,6 +286,9 @@ class RestaurantView(APIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
+
+    def patch(self, request):
+        return self.put(request)
 
 
 class RestaurantLogoView(APIView):
@@ -302,63 +374,38 @@ class MenuItemListCreateView(APIView):
         return Response(serializer.data)
 
     def post(self, request):
-        restaurant = request.user.restaurant
-        data = request.data
-
-        # Resolve category
-        category = None
-        cat_id = data.get('category') or data.get('category_id')
-        if cat_id:
-            try:
-                category = MenuCategory.objects.get(id=cat_id, restaurant=restaurant)
-            except (MenuCategory.DoesNotExist, ValueError):
-                category = None
-
-        import json
-        tags = data.get('tags', [])
-        if isinstance(tags, str):
-            try:
-                tags = json.loads(tags)
-            except Exception:
-                tags = [t.strip() for t in tags.split(',') if t.strip()]
-
-        # is_available comes as string "true"/"false" from Android multipart
-        is_available_raw = data.get('is_available', 'true')
-        if isinstance(is_available_raw, str):
-            is_available = is_available_raw.lower() in ('true', '1', 'yes')
-        else:
-            is_available = bool(is_available_raw)
-
         try:
-            item = MenuItem.objects.create(
-                restaurant=restaurant,
-                category=category,
-                name=data.get('name', ''),
-                description=data.get('description', ''),
-                price=data.get('price', 0),
-                image_url=data.get('image_url', ''),
-                prep_time=data.get('prep_time', '15 mins'),
-                spice_level=data.get('spice_level', 'Medium'),
-                tags=tags,
-                is_available=is_available,
-                is_popular='Popular' in tags,
-            )
-            if 'image' in request.FILES:
-                item.image = request.FILES['image']
-                item.save()
-
-            return Response(MenuItemSerializer(item, context={'request': request}).data, status=201)
+            # Pre-process the data to handle tags and boolean strings from Android multipart
+            data = preprocess_menu_item_data(request.data)
+            
+            # Using the serializer for creation ensures consistent handling
+            serializer = MenuItemSerializer(data=data, context={'request': request})
+            if serializer.is_valid():
+                item = serializer.save(restaurant=request.user.restaurant)
+                # Create notification
+                create_notification(
+                    request.user.restaurant, 'item_created', '🍽️',
+                    'New Item Added',
+                    f'"{item.name}" has been added to your menu.'
+                )
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response({'error': str(e)}, status=400)
-
-
+            import traceback
+            error_msg = f"{str(e)}\n{traceback.format_exc()}"
+            print(f"CRITICAL ERROR in MenuItem post: {error_msg}")
+            return Response({'error': str(e), 'traceback': traceback.format_exc()}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class MenuItemDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get_object(self, pk, request):
         try:
-            return MenuItem.objects.get(pk=pk, restaurant=request.user.restaurant)
+            restaurant = getattr(request.user, 'restaurant', None)
+            if not restaurant:
+                return None
+            return MenuItem.objects.get(pk=pk, restaurant=restaurant)
         except MenuItem.DoesNotExist:
             return None
 
@@ -369,44 +416,39 @@ class MenuItemDetailView(APIView):
         return Response(MenuItemSerializer(item, context={'request': request}).data)
 
     def put(self, request, pk):
-        item = self.get_object(pk, request)
-        if not item:
-            return Response({'error': 'Item not found.'}, status=404)
-        data = request.data
+        try:
+            item = self.get_object(pk, request)
+            if not item:
+                return Response({'error': 'Item not found.'}, status=404)
+            
+            # Pre-process the data to handle tags and boolean strings from Android multipart
+            data = preprocess_menu_item_data(request.data)
+            
+            serializer = MenuItemSerializer(item, data=data, partial=True, context={'request': request})
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"CRITICAL ERROR in MenuItem put: {error_details}")
+            return Response({'error': str(e), 'details': error_details}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        if 'category' in data:
-            try:
-                item.category = MenuCategory.objects.get(id=data['category'], restaurant=request.user.restaurant)
-            except MenuCategory.DoesNotExist:
-                pass
-
-        import json
-        if 'tags' in data:
-            tags = data['tags']
-            if isinstance(tags, str):
-                try:
-                    tags = json.loads(tags)
-                except Exception:
-                    tags = [t.strip() for t in tags.split(',') if t.strip()]
-            item.tags = tags
-            item.is_popular = 'Popular' in tags
-
-        for field in ['name', 'description', 'price', 'image_url', 'prep_time', 'spice_level', 'is_available']:
-            if field in data:
-                setattr(item, field, data[field])
-
-        if 'image' in request.FILES:
-            item.image = request.FILES['image']
-
-        item.save()
-        return Response(MenuItemSerializer(item, context={'request': request}).data)
+    def patch(self, request, pk):
+        return self.put(request, pk)
 
     def delete(self, request, pk):
         item = self.get_object(pk, request)
         if not item:
             return Response({'error': 'Item not found.'}, status=404)
-        item.delete()
-        return Response(status=204)
+        
+        try:
+            item.delete()
+            return Response(status=204)
+        except Exception as e:
+            return Response({'error': str(e)}, status=400)
 
 
 class MenuItemToggleView(APIView):
@@ -477,8 +519,17 @@ class OrderStatusUpdateView(APIView):
         if new_status not in valid_statuses:
             return Response({'error': f'Invalid status. Must be one of: {valid_statuses}'}, status=400)
 
+        old_status = order.status
         order.status = new_status
         order.save()
+        
+        # Create notification for owner
+        create_notification(
+            request.user.restaurant, 'order_status_update', '📦',
+            'Order Status Updated',
+            f"Order #{order.id} for {order.customer_name} is now {new_status} (was {old_status})."
+        )
+
         return Response(OrderSerializer(order).data)
 
 
@@ -489,38 +540,76 @@ class DashboardStatsView(APIView):
 
     def get(self, request):
         restaurant = request.user.restaurant
-        today = timezone.now().date()
+        now = timezone.localtime()
+        today = now.date()
 
-        today_orders = Order.objects.filter(restaurant=restaurant, placed_at__date=today)
-        total_orders_today = today_orders.count()
-        revenue_today = today_orders.filter(
-            status__in=['Completed', 'Served']
-        ).aggregate(total=Sum('total'))['total'] or 0
+        # Update stats for today before showing them
+        update_daily_stats(restaurant, today)
+        
+        stats, _ = DailyAnalytics.objects.get_or_create(restaurant=restaurant, date=today)
 
+        # Use active orders including 'Served' status
         active_orders = Order.objects.filter(
             restaurant=restaurant,
-            status__in=['Received', 'Preparing', 'Ready']
+            status__in=['Received', 'Preparing', 'Ready', 'Served']
         ).count()
 
-        # Trending dish (most ordered this week)
-        week_ago = timezone.now() - timedelta(days=7)
-        trending = OrderItem.objects.filter(
+        # Trending dishes (top 5 this week)
+        week_ago = now - timedelta(days=7)
+        trending_query = OrderItem.objects.filter(
             order__restaurant=restaurant,
             order__placed_at__gte=week_ago
-        ).values('name').annotate(count=Count('id')).order_by('-count').first()
-        trending_dish = trending['name'] if trending else 'N/A'
+        ).values('name').annotate(orders=Count('id')).order_by('-orders')
+        
+        top_dishes = list(trending_query[:5])
+        trending_dish = top_dishes[0]['name'] if top_dishes else 'N/A'
 
-        # Today hourly orders for chart
+        # More robust Today hourly orders for chart
+        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_of_day = start_of_day + timedelta(days=1)
+        
+        today_orders = Order.objects.filter(
+            restaurant=restaurant, 
+            placed_at__gte=start_of_day,
+            placed_at__lt=end_of_day
+        )
+        
+        # Group by hour in Python to be timezone-safe
+        order_counts = {}
+        for order in today_orders:
+            # Important: Use localtime of the order timestamp
+            local_placed_at = timezone.localtime(order.placed_at)
+            h = local_placed_at.hour
+            order_counts[h] = order_counts.get(h, 0) + 1
+            
         hourly_data = []
-        for hour in range(8, 23):
-            count = today_orders.filter(placed_at__hour=hour).count()
-            hourly_data.append({'hour': f'{hour}:00', 'orders': count})
+        for hour in range(24):
+            display_hour = hour % 12
+            if display_hour == 0: display_hour = 12
+            am_pm = 'AM' if hour < 12 else 'PM'
+            label = f'{display_hour} {am_pm}'
+            
+            hourly_data.append({
+                'name': label, 
+                'orders': order_counts.get(hour, 0)
+            })
+
+        # Check for Daily Sales Summary Notification (once per day)
+        summary_title = f"Daily Summary - {today.strftime('%d %b %Y')}"
+        if not OwnerNotification.objects.filter(restaurant=restaurant, notification_type='daily_sales_summary', title=summary_title).exists():
+            today_revenue = today_orders.aggregate(Sum('total'))['total__sum'] or 0
+            create_notification(
+                restaurant, 'daily_sales_summary', '📊',
+                summary_title,
+                f"Progress so far: {today_orders.count()} orders, ₹{today_revenue} revenue."
+            )
 
         return Response({
-            'total_orders_today': total_orders_today,
-            'revenue_today': float(revenue_today),
+            'total_orders_today': today_orders.count(), 
+            'revenue_today': float(stats.total_revenue) if stats.total_revenue else 0.0,
             'active_orders': active_orders,
             'trending_dish': trending_dish,
+            'top_dishes': top_dishes,
             'hourly_data': hourly_data,
         })
 
@@ -531,30 +620,38 @@ class SalesAnalyticsView(APIView):
     def get(self, request):
         restaurant = request.user.restaurant
         period = request.query_params.get('period', 'week')
+        days = 30 if period == 'month' else 7
 
-        if period == 'week':
-            days = 7
-        elif period == 'month':
-            days = 30
-        else:
-            days = 7
+        now = timezone.localtime()
+        
+        # Ensure summary table is populated for the requested range
+        for i in range(days):
+            day = now.date() - timedelta(days=i)
+            # We don't update EVERY time to save DB calls, just ensure it exists
+            # but for simplicity in this implementation, we ensure data is fresh
+            update_daily_stats(restaurant, day)
 
-        data = []
-        for i in range(days - 1, -1, -1):
-            day = timezone.now().date() - timedelta(days=i)
-            orders = Order.objects.filter(
-                restaurant=restaurant,
-                placed_at__date=day,
-                status__in=['Completed', 'Served']
-            )
-            revenue = orders.aggregate(total=Sum('total'))['total'] or 0
-            data.append({
-                'date': day.strftime('%d %b'),
-                'revenue': float(revenue),
-                'orders': Order.objects.filter(restaurant=restaurant, placed_at__date=day).count(),
-            })
+        stats = DailyAnalytics.objects.filter(
+            restaurant=restaurant,
+            date__gte=now.date() - timedelta(days=days-1)
+        ).order_by('date')
 
-        return Response({'data': data, 'period': period})
+        data = [{
+            'date': item.date.strftime('%d %b'),
+            'revenue': float(item.total_revenue),
+            'orders': item.total_orders,
+        } for item in stats]
+
+        top_dishes = list(OrderItem.objects.filter(
+            order__restaurant=restaurant,
+            order__placed_at__gte=now - timedelta(days=days)
+        ).values('name').annotate(orders=Count('id')).order_by('-orders')[:5])
+
+        return Response({
+            'data': data, 
+            'period': period,
+            'top_dishes': top_dishes
+        })
 
 
 class PopularDishesView(APIView):
@@ -577,18 +674,88 @@ class PeakHoursView(APIView):
 
     def get(self, request):
         restaurant = request.user.restaurant
-        week_ago = timezone.now() - timedelta(days=7)
+        now = timezone.localtime()
+        week_ago = now - timedelta(days=7)
 
-        hourly = []
+        orders = Order.objects.filter(restaurant=restaurant, placed_at__gte=week_ago)
+        order_counts = {}
+        for order in orders:
+            local_placed_at = timezone.localtime(order.placed_at)
+            h = local_placed_at.hour
+            order_counts[h] = order_counts.get(h, 0) + 1
+            
+        hourly_data = []
         for hour in range(0, 24):
-            count = Order.objects.filter(
-                restaurant=restaurant,
-                placed_at__gte=week_ago,
-                placed_at__hour=hour
-            ).count()
-            hourly.append({'hour': f'{hour:02d}:00', 'orders': count})
+            hourly_data.append({'hour': f'{hour:02d}:00', 'orders': order_counts.get(hour, 0)})
 
-        return Response({'hourly_data': hourly})
+        return Response({'hourly_data': hourly_data})
+
+
+class AIInsightsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        restaurant = request.user.restaurant
+        insights = []
+
+        from .ai_utils import get_combo_suggestions, get_price_optimization_suggestions, get_promotion_suggestions
+        
+        # 1. Combo Opportunity Logic (Real Data)
+        combo_suggs = get_combo_suggestions(restaurant)
+        for combo in combo_suggs[:2]:  # Top 2 combos
+            insights.append({
+                'type': 'COMBO_OPPORTUNITY',
+                'title': 'Combo Opportunity Detected',
+                'impact': 'HIGH IMPACT',
+                'description': f'"{combo["item_a_name"]}" and "{combo["item_b_name"]}" are frequently ordered together.',
+                'aiSuggestion': f'Create a combo for ₹{combo["suggested_combo_price"]} (save ₹{combo["savings"]}) to increase average order value.',
+                'actionLabel': 'Create Combo',
+                'data': combo # Add underlying data for frontend if needed
+            })
+
+        # 2. Price Optimization Logic (Real Data)
+        price_suggs = get_price_optimization_suggestions(restaurant)
+        for opt in price_suggs[:2]: # Top 2 price optimizations
+            insights.append({
+                'type': 'PRICE_OPTIMIZATION',
+                'title': 'Price Optimization',
+                'impact': 'MEDIUM IMPACT',
+                'description': f'"{opt["name"]}" has exceptionally high demand (ordered {opt["popularity_score"]}x average).',
+                'aiSuggestion': f'Consider adjusting the price from ₹{opt["current_price"]} to ₹{opt["suggested_price"]} to increase margins.',
+                'actionLabel': 'Update Price',
+                'data': opt
+            })
+
+        # 3. Promotion Logic (Real Data)
+        promo_suggs = get_promotion_suggestions(restaurant)
+        for promo in promo_suggs[:2]: # Top 2 promotion suggestions
+            if promo['type'] == 'DISCOUNT':
+                suggestion = f'Offer a {promo["discount_percent"]}% discount (new price: ₹{promo["suggested_promo_price"]}) to boost sales.'
+            else:
+                suggestion = promo['reason']
+                
+            insights.append({
+                'type': 'PROMOTION',
+                'title': 'Promotion Suggestion',
+                'impact': 'LOW IMPACT',
+                'description': f'"{promo["name"]}" is struggling to get orders.',
+                'aiSuggestion': suggestion,
+                'actionLabel': 'Apply Promotion',
+                'data': promo
+            })
+            
+        # Fallback if no real data is available yet
+        if not insights:
+             insights.append({
+                'type': 'PROMOTION',
+                'title': 'Menu Review',
+                'impact': 'LOW IMPACT',
+                'description': f'We need more order data to generate accurate insights.',
+                'aiSuggestion': f'Keep running your restaurant to gather more data for AI analysis!',
+                'actionLabel': 'Got It'
+            })
+
+        return Response({'insights': insights})
 
 
 # ─────────────────── QR CODE ───────────────────
@@ -700,6 +867,15 @@ class PublicCreateOrderView(APIView):
         order.total = subtotal + tax
         order.save()
 
+        # Create notification for the owner
+        item_count = len(data['items'])
+        table_info = f"Table {order.table_number}" if order.table_number else order.qr_type
+        create_notification(
+            restaurant, 'new_order', '🛒',
+            'New Order Received',
+            f'Order #{order.id} ({item_count} items, ₹{order.total}) from {table_info}.'
+        )
+
         return Response({
             'order_id': order.id,
             'status': order.status,
@@ -729,3 +905,72 @@ class PublicOrderHistoryView(APIView):
         id_list = [i for i in order_ids.split(',') if i.isdigit()]
         orders = Order.objects.filter(id__in=id_list)
         return Response(OrderSerializer(orders, many=True).data)
+
+
+# ─────────────────── NOTIFICATIONS ───────────────────
+
+class NotificationListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            restaurant = request.user.restaurant
+            notifications = OwnerNotification.objects.filter(restaurant=restaurant)[:50]
+            data = [{
+                'id': n.id,
+                'notification_type': n.notification_type,
+                'icon': n.icon,
+                'title': n.title,
+                'body': n.body,
+                'is_read': n.is_read,
+                'created_at': n.created_at.isoformat(),
+            } for n in notifications]
+            return Response(data)
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+
+    def post(self, request):
+        """Mark all read or clear all."""
+        restaurant = request.user.restaurant
+        action = request.data.get('action', '')
+        if action == 'mark_all_read':
+            OwnerNotification.objects.filter(restaurant=restaurant, is_read=False).update(is_read=True)
+            return Response({'message': 'All notifications marked as read.'})
+        elif action == 'clear_all':
+            OwnerNotification.objects.filter(restaurant=restaurant).delete()
+            return Response({'message': 'All notifications cleared.'})
+        return Response({'error': 'Invalid action.'}, status=400)
+
+
+class NotificationSettingsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        settings, _ = OwnerNotificationSetting.objects.get_or_create(restaurant=request.user.restaurant)
+        return Response({
+            'new_order_alerts': settings.new_order_alerts,
+            'order_status_updates': settings.order_status_updates,
+            'daily_sales_summary': settings.daily_sales_summary,
+            'ai_suggestions': settings.ai_suggestions,
+        })
+
+    def post(self, request):
+        settings, _ = OwnerNotificationSetting.objects.get_or_create(restaurant=request.user.restaurant)
+        settings.new_order_alerts = request.data.get('new_order_alerts', settings.new_order_alerts)
+        settings.order_status_updates = request.data.get('order_status_updates', settings.order_status_updates)
+        settings.daily_sales_summary = request.data.get('daily_sales_summary', settings.daily_sales_summary)
+        settings.ai_suggestions = request.data.get('ai_suggestions', settings.ai_suggestions)
+        settings.save()
+        return Response({'status': 'updated'})
+
+
+class NotificationDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        try:
+            n = OwnerNotification.objects.get(pk=pk, restaurant=request.user.restaurant)
+            n.delete()
+            return Response(status=204)
+        except OwnerNotification.DoesNotExist:
+            return Response({'error': 'Notification not found.'}, status=404)

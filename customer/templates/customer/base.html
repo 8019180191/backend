@@ -15,6 +15,7 @@
 
     :root {
       --red: #E53935;
+      --red-primary: var(--red);
       --red-dark: #B71C1C;
       --red-light: #FFEBEE;
       --gray-50: #F9FAFB;
@@ -26,6 +27,16 @@
       --gray-900: #111827;
       --white: #FFFFFF;
       --shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    .discount-badge {
+      background: var(--red);
+      color: #fff;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      display: inline-block;
     }
 
     body {
@@ -240,8 +251,8 @@
     }
 
     .add-btn {
-      width: 32px;
-      height: 32px;
+      width: 38px;
+      height: 38px;
       border-radius: 50%;
       background: var(--red);
       display: flex;
@@ -252,8 +263,8 @@
     }
 
     .add-btn svg {
-      width: 16px;
-      height: 16px;
+      width: 22px;
+      height: 22px;
     }
 
     /* Tags */
@@ -302,37 +313,44 @@
       justify-content: center;
     }
 
-    /* Qty control */
+    /* Qty control - Pill shaped */
     .qty-control {
       display: flex;
       align-items: center;
-      gap: 8px;
-      background: var(--gray-100);
-      border-radius: 12px;
+      gap: 12px;
+      background: #f8f9fa;
+      border-radius: 999px;
       padding: 4px;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+      border: 1px solid rgba(0, 0, 0, 0.1);
     }
 
     .qty-btn {
-      width: 28px;
-      height: 28px;
-      border-radius: 8px;
+      width: 32px;
+      height: 32px;
+      border-radius: 12px;
       background: #fff;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      color: var(--gray-900);
+      font-size: 1.2rem;
+      font-weight: 700;
+      transition: all 0.2s;
     }
 
-    .qty-btn svg {
-      width: 14px;
-      height: 14px;
+    .qty-btn:active {
+      transform: scale(0.9);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
     }
 
     .qty-val {
-      font-weight: 800;
-      min-width: 20px;
+      font-weight: 900;
+      min-width: 24px;
       text-align: center;
-      font-size: .9rem;
+      font-size: 1.1rem;
+      color: var(--gray-900);
     }
 
     /* Status badge */
@@ -583,12 +601,174 @@
     .animate {
       animation: fadeIn .35s ease both;
     }
+
+    /* Chatbot Styles */
+    #chatbot-fab {
+      position: fixed;
+      right: 20px;
+      bottom: 80px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--red);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 16px rgba(229, 57, 53, 0.4);
+      z-index: 999;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      cursor: pointer;
+    }
+
+    #chatbot-fab:active {
+      transform: scale(0.9);
+    }
+
+    #chatbot-fab.with-cart {
+      bottom: 150px;
+    }
+
+    #chat-window {
+      position: fixed;
+      right: 20px;
+      bottom: 150px;
+      width: calc(100% - 40px);
+      max-width: 350px;
+      height: 450px;
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transform-origin: bottom right;
+      transform: scale(0);
+      opacity: 0;
+      transition: all 0.3s ease;
+      visibility: hidden;
+    }
+
+    #chat-window.show {
+      transform: scale(1);
+      opacity: 1;
+      visibility: visible;
+    }
+
+    #chat-window.with-cart {
+      bottom: 220px;
+    }
+
+    .chat-header {
+      background: var(--red);
+      color: #fff;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .chat-header h3 {
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    #chat-messages {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--gray-50);
+    }
+
+    .message {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 14px;
+      font-size: 0.88rem;
+      line-height: 1.4;
+    }
+
+    .msg-bot {
+      align-self: flex-start;
+      background: var(--gray-200);
+      color: var(--gray-900);
+      border-bottom-left-radius: 4px;
+    }
+
+    .msg-user {
+      align-self: flex-end;
+      background: var(--red);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .chat-footer {
+      padding: 12px;
+      display: flex;
+      gap: 8px;
+      border-top: 1px solid var(--gray-100);
+      background: #fff;
+    }
+
+    .chat-footer input {
+      flex: 1;
+      border: 1px solid var(--gray-200);
+      border-radius: 12px;
+      padding: 8px 12px;
+      font-size: 0.88rem;
+      outline: none;
+    }
+
+    .chat-footer input:focus {
+      border-color: var(--red);
+    }
+
+    .chat-send-btn {
+      color: var(--red);
+      padding: 4px;
+    }
   </style>
   {% block extra_head %}{% endblock %}
 </head>
 
 <body>
   {% block content %}{% endblock %}
+
+  <!-- Chatbot -->
+  <div id="chatbot-fab" onclick="toggleChat()">
+    <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+      <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" />
+    </svg>
+  </div>
+
+  <div id="chat-window">
+    <div class="chat-header">
+      <h3>Restaurant Assistant</h3>
+      <button onclick="toggleChat()" style="color:#fff;">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+          <path
+            d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+        </svg>
+      </button>
+    </div>
+    <div id="chat-messages">
+      <div class="message msg-bot">Hi! I'm your AI assistant. Ask me anything about the menu or our recommendations!
+      </div>
+    </div>
+    <div class="chat-footer">
+      <input type="text" id="chat-input" placeholder="Ask a question..."
+        onkeypress="if(event.key==='Enter') sendMessage()">
+      <button class="chat-send-btn" onclick="sendMessage()">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+        </svg>
+      </button>
+    </div>
+  </div>
 
   <!-- Bottom Nav -->
   {% block bottom_nav %}
@@ -620,73 +800,191 @@
     <a href="/menu/{{ token }}/orders/?table={{ table }}" class="nav-item {% block nav_orders %}{% endblock %}">
       <svg viewBox="0 0 24 24" fill="currentColor">
         <path
-          d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z" />
+          d="M13 12h7v1.5h-7zm0-2.5h7V11h-7zm0 5h7V16h-7zM21 4H3c-1.1 0-2 .9-2 2v13c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 15h-9V6h9v13z" />
       </svg>
       Orders
     </a>
   </nav>
   {% endblock %}
 
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script>
-    // Cart stored in sessionStorage
-    const TOKEN = '{{ token }}';
-    const TABLE = '{{ table }}';
-
+    // Cart management
     function getCart() {
-      try { return JSON.parse(sessionStorage.getItem('cart_' + TOKEN) || '[]'); }
-      catch (e) { return []; }
+      return JSON.parse(sessionStorage.getItem('cart_{{ token }}') || '[]');
     }
     function saveCart(cart) {
-      sessionStorage.setItem('cart_' + TOKEN, JSON.stringify(cart));
+      sessionStorage.setItem('cart_{{ token }}', JSON.stringify(cart));
       updateCartBadge();
+      updateCartBar();
+      renderAllItemControls();
+    }
+    function addToCart(id, name, price, originalPrice, image) {
+      const cart = getCart();
+      const idx = cart.findIndex(i => i.id === id);
+      if (idx > -1) {
+        cart[idx].quantity += 1;
+      } else {
+        cart.push({ id, name, price, originalPrice, image, quantity: 1 });
+      }
+      saveCart(cart);
+    }
+    function incrementItem(id, name, price, originalPrice, image) {
+      addToCart(id, name, price, originalPrice, image);
+    }
+    function decrementItem(id) {
+      const cart = getCart();
+      const idx = cart.findIndex(i => i.id === id);
+      if (idx > -1) {
+        cart[idx].quantity -= 1;
+        if (cart[idx].quantity <= 0) cart.splice(idx, 1);
+        saveCart(cart);
+      }
     }
     function updateCartBadge() {
       const cart = getCart();
-      const count = cart.reduce((s, i) => s + i.quantity, 0);
-      const badge = document.getElementById('cart-badge');
-      if (badge) {
-        badge.textContent = count;
-        badge.style.display = count > 0 ? 'flex' : 'none';
+      const total = cart.reduce((s, i) => s + i.quantity, 0);
+      const b = document.getElementById('cart-badge');
+      if (b) {
+        b.textContent = total;
+        b.style.display = total > 0 ? 'flex' : 'none';
       }
-    }
-    function addToCart(id, name, price, image) {
-      const cart = getCart();
-      const existing = cart.find(i => i.id === id);
-      if (existing) { existing.quantity++; }
-      else { cart.push({ id, name, price, image, quantity: 1 }); }
-      saveCart(cart);
-      showToast('Added to cart!');
-      updateCartBar();
-    }
-    function showToast(msg) {
-      let t = document.getElementById('toast');
-      if (!t) {
-        t = document.createElement('div');
-        t.id = 'toast';
-        t.style.cssText = 'position:fixed;bottom:160px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:10px 20px;border-radius:12px;font-weight:700;z-index:999;font-size:.85rem;opacity:0;transition:opacity .3s;';
-        document.body.appendChild(t);
-      }
-      t.textContent = msg;
-      t.style.opacity = '1';
-      setTimeout(() => t.style.opacity = '0', 2000);
     }
     function updateCartBar() {
-      const cart = getCart();
       const bar = document.getElementById('floating-cart-bar');
       if (!bar) return;
-      const count = cart.reduce((s, i) => s + i.quantity, 0);
-      const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-      if (count > 0) {
+      const cart = getCart();
+      const totalItems = cart.reduce((s, i) => s + i.quantity, 0);
+      const totalPrice = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
+      const fab = document.getElementById('chatbot-fab');
+      const chat = document.getElementById('chat-window');
+
+      if (totalItems > 0) {
         bar.classList.add('show');
-        const el = document.getElementById('cart-bar-info');
-        if (el) el.innerHTML = `<div class="cart-bar-count">${count} item${count > 1 ? 's' : ''}</div><div class="cart-bar-total">₹${total.toFixed(0)}</div>`;
+        document.getElementById('cart-bar-info').innerHTML = `
+          <div class="cart-bar-count">${totalItems} item${totalItems > 1 ? 's' : ''}</div>
+          <div class="cart-bar-total">₹${totalPrice.toFixed(0)}</div>
+        `;
+        if (fab) fab.classList.add('with-cart');
+        if (chat) chat.classList.add('with-cart');
       } else {
         bar.classList.remove('show');
+        if (fab) fab.classList.remove('with-cart');
+        if (chat) chat.classList.remove('with-cart');
       }
     }
+
+    function renderItemControl(container, item) {
+      const cart = getCart();
+      const cartItem = cart.find(i => i.id === item.id);
+      const qty = cartItem ? cartItem.quantity : 0;
+      container.innerHTML = '';
+
+      if (qty <= 0) {
+        const btn = document.createElement('button');
+        btn.className = 'add-btn';
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" /></svg>';
+        btn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); addToCart(item.id, item.name, item.price, item.originalPrice, item.image); };
+        container.appendChild(btn);
+      } else {
+        const wrap = document.createElement('div');
+        wrap.className = 'qty-control';
+        wrap.onclick = (e) => { e.preventDefault(); e.stopPropagation(); };
+
+        const dec = document.createElement('button');
+        dec.className = 'qty-btn';
+        dec.textContent = '–';
+        dec.onclick = () => decrementItem(item.id);
+
+        const val = document.createElement('span');
+        val.className = 'qty-val';
+        val.textContent = qty;
+
+        const inc = document.createElement('button');
+        inc.className = 'qty-btn';
+        inc.textContent = '+';
+        inc.onclick = () => incrementItem(item.id, item.name, item.price, item.originalPrice, item.image);
+
+        wrap.appendChild(dec);
+        wrap.appendChild(val);
+        wrap.appendChild(inc);
+        container.appendChild(wrap);
+      }
+    }
+
+    function renderAllItemControls() {
+      if (typeof MENU_ITEMS === 'undefined') return;
+      document.querySelectorAll('.item-control').forEach(container => {
+        const id = container.getAttribute('data-item-id');
+        const item = MENU_ITEMS.find(i => i.id === id);
+        if (item) renderItemControl(container, item);
+      });
+    }
+
+    function showToast(msg) {
+      Swal.fire({
+        text: msg,
+        toast: true,
+        position: 'top',
+        showConfirmButton: false,
+        timer: 3000,
+        background: '#333',
+        color: '#fff'
+      });
+    }
+
+    // Chatbot
+    function toggleChat() {
+      const w = document.getElementById('chat-window');
+      w.classList.toggle('show');
+      if (w.classList.contains('show')) {
+        document.getElementById('chat-input').focus();
+      }
+    }
+    function addChatMessage(text, side) {
+      const msgs = document.getElementById('chat-messages');
+      const div = document.createElement('div');
+      div.className = `message msg-${side}`;
+      div.textContent = text;
+      msgs.appendChild(div);
+      msgs.scrollTop = msgs.scrollHeight;
+    }
+    async function sendMessage() {
+      const inp = document.getElementById('chat-input');
+      const msg = inp.value.trim();
+      if (!msg) return;
+      addChatMessage(msg, 'user');
+      inp.value = '';
+      try {
+        const resp = await fetch(`/menu/{{ token }}/chat/`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+          body: JSON.stringify({ message: msg })
+        });
+        const data = await resp.json();
+        addChatMessage(data.response || "Sorry, I couldn't understand that.", 'bot');
+      } catch (e) {
+        addChatMessage("Network error. Please try again.", 'bot');
+      }
+    }
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
       updateCartBadge();
       updateCartBar();
+      renderAllItemControls();
     });
   </script>
   {% block extra_scripts %}{% endblock %}

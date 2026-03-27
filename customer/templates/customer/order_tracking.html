@@ -45,6 +45,61 @@
             </div>
         </div>
 
+        <!-- Rating Block -->
+        {% if order.rating %}
+        <div id="rating-summary-block"
+            style="background:#fff;border-radius:20px;padding:18px;box-shadow:var(--shadow);margin-bottom:14px;text-align:center;">
+            <h3 style="font-weight:800;margin-bottom:8px;">Your Rating</h3>
+            <div style="display:flex;justify-content:center;gap:4px;">
+                <div style="color:#FFD700;font-size:24px;">
+                    {% for _ in "12345" %}
+                    {% if forloop.counter <= order.rating %} ★ {% else %} <span style="color:var(--gray-300)">★</span>
+                        {% endif %}
+                        {% endfor %}
+                </div>
+            </div>
+            {% if order.review_notes %}
+            <p style="margin-top:8px;font-size:0.9rem;color:var(--gray-600);font-style:italic;">
+                "{{ order.review_notes }}"
+            </p>
+            {% endif %}
+        </div>
+        {% else %}
+        <div id="rating-block"
+            style="background:#fff;border-radius:20px;padding:18px;box-shadow:var(--shadow);margin-bottom:14px;text-align:center;">
+            <h3 style="font-weight:800;margin-bottom:8px;">Rate Your Experience</h3>
+            <div id="stars-container"
+                style="display:flex;justify-content:center;gap:8px;margin-bottom:12px;cursor:pointer;">
+                <svg class="star" data-value="1" viewBox="0 0 24 24" fill="var(--gray-300)" width="36" height="36">
+                    <path
+                        d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                </svg>
+                <svg class="star" data-value="2" viewBox="0 0 24 24" fill="var(--gray-300)" width="36" height="36">
+                    <path
+                        d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                </svg>
+                <svg class="star" data-value="3" viewBox="0 0 24 24" fill="var(--gray-300)" width="36" height="36">
+                    <path
+                        d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                </svg>
+                <svg class="star" data-value="4" viewBox="0 0 24 24" fill="var(--gray-300)" width="36" height="36">
+                    <path
+                        d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                </svg>
+                <svg class="star" data-value="5" viewBox="0 0 24 24" fill="var(--gray-300)" width="36" height="36">
+                    <path
+                        d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                </svg>
+            </div>
+            <textarea id="review-notes" placeholder="Any comments? (Optional)"
+                style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--gray-200);margin-bottom:12px;resize:none;display:none;font-family:inherit;"></textarea>
+            <button id="submit-rating-btn" class="btn btn-primary" style="display:none;width:100%;"
+                onclick="submitRating()">Submit Review</button>
+            <div id="rating-success" style="display:none;color:#4caf50;font-weight:bold;margin-top:10px;">⭐ Thank you
+                for your feedback!</div>
+        </div>
+        {% endif %}
+
         <!-- Call to action based on status -->
         <div id="cta-area"></div>
     </div>
@@ -85,12 +140,77 @@
         const cta = document.getElementById('cta-area');
         if (status === 'Completed' || status === 'Served') {
             cta.innerHTML = `<a href="/menu/{{ token }}/home/?table={{ table }}" class="btn btn-primary">Order Again 🍛</a>`;
+            const rb = document.getElementById('rating-block');
+            if (rb) rb.style.display = 'block';
         } else if (status === 'Cancelled') {
             cta.innerHTML = `<a href="/menu/{{ token }}/home/?table={{ table }}" class="btn btn-primary">Back to Menu</a>`;
         } else {
             cta.innerHTML = '';
         }
     }
+
+    // Rating Logic
+    let selectedRating = 0;
+    const stars = document.querySelectorAll('.star');
+
+    function highlightStars(val) {
+        stars.forEach(star => {
+            if (parseInt(star.getAttribute('data-value')) <= val) {
+                star.setAttribute('fill', '#FFD700'); // Gold
+            } else {
+                star.setAttribute('fill', 'var(--gray-300)');
+            }
+        });
+    }
+
+    stars.forEach(star => {
+        star.addEventListener('mouseover', function () {
+            highlightStars(parseInt(this.getAttribute('data-value')));
+        });
+        star.addEventListener('mouseout', function () {
+            highlightStars(selectedRating);
+        });
+        star.addEventListener('click', function () {
+            selectedRating = parseInt(this.getAttribute('data-value'));
+            highlightStars(selectedRating);
+            document.getElementById('review-notes').style.display = 'block';
+            document.getElementById('submit-rating-btn').style.display = 'block';
+        });
+    });
+
+    function submitRating() {
+        if (selectedRating === 0) return;
+
+        const notes = document.getElementById('review-notes').value;
+        const btn = document.getElementById('submit-rating-btn');
+        btn.textContent = 'Submitting...';
+        btn.disabled = true;
+
+        fetch(`/menu/{{ token }}/track/{{ order.id }}/rate/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken') // Ensure base.html provides this
+            },
+            body: JSON.stringify({ rating: selectedRating, notes: notes })
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.message) {
+                    document.getElementById('stars-container').style.display = 'none';
+                    document.getElementById('review-notes').style.display = 'none';
+                    btn.style.display = 'none';
+                    document.getElementById('rating-success').style.display = 'block';
+                    document.getElementById('rating-block').querySelector('h3').textContent = 'Rated ' + selectedRating + ' Stars';
+                }
+            })
+            .catch(e => {
+                console.error(e);
+                btn.textContent = 'Submit Review';
+                btn.disabled = false;
+            });
+    }
+
 
     async function pollStatus() {
         try {

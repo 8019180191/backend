@@ -94,9 +94,13 @@ class MenuItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MenuItem
-        fields = ['id', 'category', 'category_name', 'name', 'description',
-                  'price', 'image', 'image_url', 'display_image', 'is_available',
-                  'prep_time', 'spice_level', 'tags', 'is_popular']
+        fields = [
+            'id', 'category', 'category_name', 'name', 'description',
+            'price', 'image', 'image_url', 'display_image', 'is_available',
+            'prep_time', 'spice_level', 'state', 'tags', 'is_popular',
+            'discount_price', 'discount_until', 'is_discount_active',
+            'effective_price', 'discount_percentage'
+        ]
 
     def get_category_name(self, obj):
         return obj.category.name if obj.category else ''
@@ -106,6 +110,7 @@ class MenuItemSerializer(serializers.ModelSerializer):
         if obj.image and request:
             return request.build_absolute_uri(obj.image.url)
         return obj.image_url or ''
+
 
 
 class OrderItemSerializer(serializers.ModelSerializer):

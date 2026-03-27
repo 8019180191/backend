@@ -26,14 +26,21 @@ class OrderItemInline(admin.TabularInline):
     readonly_fields = ['subtotal']
 
 
+@admin.register(MenuItem)
+class MenuItemAdmin(admin.ModelAdmin):
+    list_display = ['name', 'category', 'price', 'is_available', 'spice_level', 'state', 'is_popular']
+    list_filter = ['category', 'is_available', 'spice_level', 'state', 'is_popular']
+    search_fields = ['name', 'description']
+
+
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ['id', 'restaurant', 'table_number', 'status', 'total', 'placed_at']
-    list_filter = ['status', 'restaurant']
+    list_display = ['id', 'restaurant', 'table_number', 'status', 'total', 'rating', 'placed_at']
+    list_filter = ['status', 'restaurant', 'rating']
+    readonly_fields = ['rating', 'review_notes']
     inlines = [OrderItemInline]
 
 
 admin.site.register(Owner, OwnerAdmin)
 admin.site.register(Restaurant)
 admin.site.register(MenuCategory)
-admin.site.register(MenuItem)

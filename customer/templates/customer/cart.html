@@ -34,6 +34,16 @@
             style="background:#fff;border-radius:20px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:14px;">
         </div>
 
+        <!-- Suggestions moved here -->
+        <div id="suggestions-section" style="display:none;margin-bottom:24px;">
+            <h3 style="font-weight:800;font-size:.95rem;margin-bottom:12px;padding-left:4px;">Complete your Combo & Save
+            </h3>
+            <div id="suggestions-list"
+                style="display:flex;gap:12px;overflow-x:auto;padding:4px;scrollbar-width:none;-ms-overflow-style:none;">
+                <!-- Suggested items will append here -->
+            </div>
+        </div>
+
         <!-- Notes -->
         <div style="background:#fff;border-radius:20px;padding:18px;box-shadow:var(--shadow);margin-bottom:14px;">
             <h3 style="font-weight:800;font-size:.95rem;margin-bottom:10px;">Cooking Instructions</h3>
@@ -49,15 +59,24 @@
                 <span>Item Total</span><span id="bill-subtotal" style="color:var(--gray-900);font-weight:600;">₹0</span>
             </div>
             <div
-                style="display:flex;justify-content:space-between;font-size:.88rem;color:var(--gray-600);margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--gray-100);">
+                style="display:flex;justify-content:space-between;font-size:.88rem;color:var(--gray-600);margin-bottom:8px;">
                 <span>Taxes & Charges (5%)</span><span id="bill-tax"
                     style="color:var(--gray-900);font-weight:600;">₹0</span>
+            </div>
+            <div id="promo-discount-row"
+                style="display:none;justify-content:space-between;font-size:.88rem;color:#2E7D32;margin-bottom:8px;">
+                <span>Item Promotions</span><span id="bill-promo-discount" style="font-weight:600;">-₹0</span>
+            </div>
+            <div id="discount-row"
+                style="display:none;justify-content:space-between;font-size:.88rem;color:#2E7D32;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--gray-100);">
+                <span>Combo Savings</span><span id="bill-discount" style="font-weight:600;">-₹0</span>
             </div>
             <div
                 style="display:flex;justify-content:space-between;font-size:1.05rem;font-weight:900;color:var(--gray-900);">
                 <span>To Pay</span><span id="bill-total">₹0</span>
             </div>
         </div>
+
     </div>
 </div>
 
@@ -65,7 +84,7 @@
 <div style="position:fixed;bottom:76px;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:#fff;border-top:1px solid var(--gray-100);padding:14px 20px;z-index:150;box-shadow:0 -4px 20px rgba(0,0,0,.08);"
     id="checkout-bar">
     <a href="/menu/{{ token }}/checkout/?table={{ table }}" class="btn btn-primary"
-        style="justify-content:space-between;padding:14px 20px;" id="checkout-btn">
+        style="justify-content:space-between;padding:14px 20px;" id="checkout-btn" onclick="saveCartDataForCheckout()">
         <div style="display:flex;flex-direction:column;align-items:flex-start;">
             <span
                 style="font-size:.7rem;color:rgba(255,255,255,.7);font-weight:600;text-transform:uppercase;">Total</span>
@@ -77,6 +96,8 @@
 {% endblock %}
 {% block extra_scripts %}
 <script>
+    const allCombos = {{ combos_json| safe }};
+
     function renderCart() {
         const cart = getCart();
         const container = document.getElementById('cart-items');
@@ -119,16 +140,153 @@
         html += `<div style="padding:14px;"><a href="/menu/{{ token }}/home/?table={{ table }}" style="display:block;text-align:center;padding:12px;border:2px dashed var(--gray-200);border-radius:14px;color:var(--gray-500);font-weight:700;font-size:.85rem;">+ Add More Items</a></div>`;
         container.innerHTML = html;
 
-        const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-        const tax = Math.round(subtotal * 0.05);
-        const total = subtotal + tax;
+        const subtotal = cart.reduce((s, i) => s + (i.originalPrice || i.price) * i.quantity, 0);
+
+        let promoDiscount = 0;
+        cart.forEach(item => {
+            if (item.originalPrice && item.originalPrice > item.price) {
+                promoDiscount += (item.originalPrice - item.price) * item.quantity;
+            }
+        });
+
+        // Calculate Combo Discounts
+        let extraComboDiscount = 0;
+        const qtys = {};
+        cart.forEach(item => qtys[item.id] = item.quantity);
+
+        allCombos.forEach(combo => {
+            const mainQty = qtys[combo.mainId] || 0;
+            const addonQty = qtys[combo.comboId] || 0;
+            const combosFormed = Math.min(mainQty, addonQty);
+
+            if (combosFormed > 0) {
+                // savings in JSON is (orig_main + orig_addon) - combo_price
+                // we want only the extra part on top of effective prices
+                // extra = (eff_main + eff_addon) - combo_price
+                const extra = (combo.mainPrice + combo.comboItemPrice) - combo.comboPrice;
+                extraComboDiscount += combosFormed * Math.max(0, extra);
+                qtys[combo.mainId] -= combosFormed;
+                qtys[combo.comboId] -= combosFormed;
+            }
+        });
+
+        const taxableAmount = Math.max(0, subtotal - promoDiscount - extraComboDiscount);
+        const tax = Math.round(taxableAmount * 0.05);
+        const total = taxableAmount + tax;
+
         document.getElementById('bill-subtotal').textContent = '₹' + subtotal.toFixed(0);
         document.getElementById('bill-tax').textContent = '₹' + tax;
+
+        const promoDiscRow = document.getElementById('promo-discount-row');
+        if (promoDiscount > 0) {
+            promoDiscRow.style.display = 'flex';
+            document.getElementById('bill-promo-discount').textContent = '-₹' + promoDiscount.toFixed(0);
+        } else {
+            promoDiscRow.style.display = 'none';
+        }
+
+        const discRow = document.getElementById('discount-row');
+        if (extraComboDiscount > 0) {
+            discRow.style.display = 'flex';
+            document.getElementById('bill-discount').textContent = '-₹' + extraComboDiscount.toFixed(0);
+        } else {
+            discRow.style.display = 'none';
+        }
+
         document.getElementById('bill-total').textContent = '₹' + total;
         document.getElementById('checkout-total').textContent = '₹' + total;
+
+        renderSuggestions(cart);
+    }
+
+    function renderSuggestions(cart) {
+        const suggestionSection = document.getElementById('suggestions-section');
+        const suggestionList = document.getElementById('suggestions-list');
+        const cartItemIds = cart.map(item => item.id.toString());
+
+        const suggestions = [];
+        allCombos.forEach(combo => {
+            const hasMain = cartItemIds.includes(combo.mainId.toString());
+            const hasAddon = cartItemIds.includes(combo.comboId.toString());
+
+            if (hasMain && !hasAddon) {
+                // Suggest Addon
+                if (!suggestions.find(s => s.id === combo.comboId)) {
+                    suggestions.push({
+                        id: combo.comboId,
+                        name: combo.comboName,
+                        price: combo.comboItemPrice,
+                        image: combo.image,
+                        savings: combo.savings,
+                        reason: `Goes great with ${combo.mainName}`
+                    });
+                }
+            } else if (hasAddon && !hasMain) {
+                // Suggest Main
+                if (!suggestions.find(s => s.id === combo.mainId)) {
+                    suggestions.push({
+                        id: combo.mainId,
+                        name: combo.mainName,
+                        price: combo.mainPrice,
+                        image: combo.mainImage,
+                        savings: combo.savings,
+                        reason: `Goes great with ${combo.comboName}`
+                    });
+                }
+            }
+        });
+
+        if (suggestions.length === 0) {
+            suggestionSection.style.display = 'none';
+            return;
+        }
+
+        suggestionSection.style.display = 'block';
+        let html = '';
+        suggestions.forEach(s => {
+            html += `
+                <div style="flex:0 0 160px;background:#fff;border-radius:16px;padding:10px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:8px;">
+                    <div style="position:relative;">
+                        <img src="${s.image || '/static/img/placeholder.png'}" style="width:100%;height:100px;object-fit:cover;border-radius:10px;"/>
+                        <span style="position:absolute;top:6px;right:6px;background:var(--red);color:#fff;font-size:10px;font-weight:900;padding:2px 6px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,.1);">SAVE ₹${s.savings}</span>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:2px;">
+                        <span style="font-weight:800;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.name}</span>
+                        <span style="font-size:10px;color:var(--gray-500);line-height:1.2;">${s.reason}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+                        <span style="font-weight:900;font-size:.9rem;">₹${s.price}</span>
+                        <button onclick="addSuggestedItem('${s.id}')" 
+                                style="background:var(--red);color:#fff;border:none;border-radius:8px;padding:4px 10px;font-size:.8rem;font-weight:800;cursor:pointer;">
+                            Add
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        suggestionList.innerHTML = html;
+    }
+
+    function addSuggestedItem(id) {
+        const item = allCombos.find(c => c.mainId === id || c.comboId === id);
+        let targetItem;
+        if (item.mainId === id) {
+            targetItem = { id: item.mainId, name: item.mainName, price: item.mainPrice, originalPrice: item.mainOriginalPrice, image: item.mainImage };
+        } else {
+            targetItem = { id: item.comboId, name: item.comboName, price: item.comboItemPrice, originalPrice: item.comboItemOriginalPrice, image: item.image };
+        }
+        let cart = getCart();
+        const existing = cart.find(i => i.id === targetItem.id);
+        if (existing) {
+            existing.quantity++;
+        } else {
+            cart.push({ id: targetItem.id, name: targetItem.name, price: targetItem.price, originalPrice: targetItem.originalPrice, image: targetItem.image, quantity: 1 });
+        }
+        saveCart(cart);
+        renderCart();
     }
     function removeItem(id) {
-        const cart = getCart().filter(i => i.id !== id);
+        let cart = getCart().filter(i => i.id !== id);
         saveCart(cart);
         renderCart();
     }
@@ -143,6 +301,25 @@
         saveCart(cart);
         renderCart();
     }
+    function saveCartDataForCheckout() {
+        const notes = document.getElementById('cooking-notes').value;
+        if (notes) {
+            sessionStorage.setItem('cooking_notes_{{ token }}', notes);
+        } else {
+            sessionStorage.removeItem('cooking_notes_{{ token }}');
+        }
+
+        const subtotalText = document.getElementById('bill-subtotal').textContent.replace('₹', '');
+        const taxText = document.getElementById('bill-tax').textContent.replace('₹', '');
+        const totalText = document.getElementById('bill-total').textContent.replace('₹', '');
+
+        sessionStorage.setItem('checkout_totals_{{ token }}', JSON.stringify({
+            subtotal: parseFloat(subtotalText),
+            tax: parseFloat(taxText),
+            total: parseFloat(totalText)
+        }));
+    }
+
     document.addEventListener('DOMContentLoaded', renderCart);
 </script>
 {% endblock %}
